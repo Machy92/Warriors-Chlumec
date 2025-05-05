@@ -26,3 +26,4 @@ EXPOSE 80
 
 # Spuštění Apache serveru
 CMD ["apache2-foreground"]
+
