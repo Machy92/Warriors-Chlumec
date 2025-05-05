@@ -1,0 +1,134 @@
+[
+  {
+    "name": "Nikita Fomov",
+    "age": 23
+  },
+  {
+    "name": "Dominik Landt",
+    "age": 27
+  },
+  {
+    "name": "Pavel Matoušek",
+    "age": 28
+  },
+  {
+    "name": "Michal Růžička",
+    "age": 32
+  },
+  {
+    "name": "Aleš Dvořáček",
+    "age": 31
+  },
+  {
+    "name": "Jan Hnízdo",
+    "age": 48
+  },
+  {
+    "name": "Martin Kotlář",
+    "age": 30
+  },
+  {
+    "name": "Daniel Kuziv",
+    "age": 30
+  },
+  {
+    "name": "Tomáš Kuziv",
+    "age": 16
+  },
+  {
+    "name": "Vladislav Trnka",
+    "age": 36
+  },
+  {
+    "name": "Patrik Bandry",
+    "age": 32
+  },
+  {
+    "name": "Patrik Barčák",
+    "age": 31
+  },
+  {
+    "name": "Adam Bauer",
+    "age": 22
+  },
+  {
+    "name": "Dominik Čelleňuk",
+    "age": 27
+  },
+  {
+    "name": "Jan Celner",
+    "age": 30
+  },
+  {
+    "name": "Richard Hrubeš",
+    "age": 33
+  },
+  {
+    "name": "Jakub Kopecký",
+    "age": 30
+  },
+  {
+    "name": "David Koutský",
+    "age": 34
+  },
+  {
+    "name": "Pavel Koutský",
+    "age": 36
+  },
+  {
+    "name": "David Loskot",
+    "age": 46
+  },
+  {
+    "name": "Ondřej Mottl",
+    "age": 17
+  },
+  {
+    "name": "Petr Piroš",
+    "age": 31
+  },
+  {
+    "name": "Lukáš Prokop",
+    "age": 32
+  },
+  {
+    "name": "Tomáš Prokop",
+    "age": 29
+  },
+  {
+    "name": "Jakub Tót",
+    "age": 23
+  },
+  {
+    "name": "Marek Zrzavecký",
+    "age": 28
+  },
+  {
+    "name": "Jakub Hašek",
+    "age": 28
+  },
+  {
+    "name": "Tomáš Lesko",
+    "age": 26
+  },
+  { 
+    "name": "Tomáš Schneider",
+    "age": 29
+  },
+  {
+    "id": 1,
+    "name": "Jan Celner",
+    "position": "Brankář",
+    "number": 30,
+    "birthdate": "1994-04-15",
+    "photo": "jan_celner.jpg"
+  },
+  {
+    "id": 2,
+    "name": "Petr Novák",
+    "position": "Útočník",
+    "number": 12,
+    "birthdate": "1999-09-21",
+    "photo": "petr_novak.jpg"
+  }
+]
