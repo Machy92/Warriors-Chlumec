@@ -9,6 +9,10 @@ WORKDIR /var/www/html
 # Kopírování souborů aplikace do kontejneru
 COPY . /var/www/html
 
+# ✅ Oprávnění pro Apache
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html
+
 # Instalace PostgreSQL rozšíření pro PHP
 RUN apt-get update && apt-get install -y \
     unzip \
