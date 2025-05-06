@@ -69,4 +69,51 @@
         background: #ddd;
     }
 
-    .
+    .gallery-container {
+        margin: 30px auto;
+        max-width: 1000px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .gallery-container a {
+        display: inline-block;
+    }
+
+    .gallery-container img {
+        width: 150px;
+        margin: 5px;
+    }
+    </style>
+
+<script>
+function openGallery(albumName) {
+    const gallery = document.getElementById('lightgallery');
+    gallery.innerHTML = '';
+
+    for (let i = 1; i <= 20; i++) {
+        const imagePath = `galerie/${albumName}/${i}.png`;
+
+        const a = document.createElement('a');
+        a.href = imagePath;
+        a.dataset.src = imagePath;
+        a.dataset.subHtml = `<p>Obrázek ${i}</p>`;
+
+        const img = document.createElement('img');
+        img.src = imagePath;
+        img.alt = `Fotka ${i}`;
+
+        a.appendChild(img);
+        gallery.appendChild(a);
+    }
+
+    lightGallery(gallery, {
+        plugins: [lgZoom, lgThumbnail],
+        speed: 500,
+        download: false
+    });
+}
+</script>
+</body>
+</html>
