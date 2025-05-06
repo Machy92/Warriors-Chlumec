@@ -33,7 +33,7 @@ foreach ($hraci as $hrac) {
             color: #333;
         }
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: auto;
             padding-top: 50px;
         }
@@ -54,13 +54,14 @@ foreach ($hraci as $hrac) {
             background-color: white;
             position: relative;
             transition: 0.3s;
+            height: 100%;
         }
         .player-card:hover {
             box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.1);
         }
         .player-card img {
-            width: 60px;
-            height: 60px;
+            width: 80px;
+            height: 80px;
             object-fit: cover;
             border-radius: 50%;
             margin-bottom: 10px;
@@ -80,6 +81,15 @@ foreach ($hraci as $hrac) {
             right: 0; bottom: 0;
             z-index: 1;
         }
+        @media (max-width: 576px) {
+            .player-card {
+                padding: 15px;
+            }
+            .player-card img {
+                width: 60px;
+                height: 60px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -93,24 +103,24 @@ foreach ($hraci as $hrac) {
     <?php if (!empty($rozdelene)): ?>
         <?php foreach ($pozice as $pozice_klic => $pozice_nazev): ?>
             <?php if (!isset($rozdelene[$pozice_klic])) continue; ?>
-            <div class="team-header"> <?= $pozice_nazev ?> </div>
-            <div class="row g-3">
-    <?php foreach ($rozdelene[$pozice_klic] as $hrac): ?>
-        <div class="col-12 col-sm-6 col-md-4">
-            <div class="player-card">
-                <img src="<?= htmlspecialchars($hrac['photo']) ?>" alt="<?= htmlspecialchars($hrac['name']) ?>">
-                <div class="player-name"><?= htmlspecialchars($hrac['name']) ?></div>
-                <div class="player-info">
-                    Číslo: <?= htmlspecialchars($hrac['number']) ?><br>
-                    Věk: <?= htmlspecialchars($hrac['age']) ?><br>
-                    Pozice: <?= htmlspecialchars($hrac['position']) ?>
-                </div>
-                <a href="profil_hrace.php?jmeno=<?= urlencode($hrac['slug']) ?>" class="stretched-link"></a>
+            
+            <div class="team-header"><?= $pozice_nazev ?></div>
+            <div class="row g-4">
+                <?php foreach ($rozdelene[$pozice_klic] as $hrac): ?>
+                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 d-flex">
+                        <div class="player-card w-100">
+                            <img src="<?= htmlspecialchars($hrac['photo']) ?>" alt="<?= htmlspecialchars($hrac['name']) ?>">
+                            <div class="player-name"><?= htmlspecialchars($hrac['name']) ?></div>
+                            <div class="player-info">
+                                Číslo: <?= htmlspecialchars($hrac['number']) ?><br>
+                                Věk: <?= htmlspecialchars($hrac['age']) ?><br>
+                                Pozice: <?= htmlspecialchars($hrac['position']) ?>
+                            </div>
+                            <a href="profil_hrace.php?jmeno=<?= urlencode($hrac['slug']) ?>" class="stretched-link"></a>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
-        </div>
-    <?php endforeach; ?>
-</div>
-
         <?php endforeach; ?>
     <?php else: ?>
         <div class="alert alert-warning text-center">Žádní hráči nenalezeni</div>
