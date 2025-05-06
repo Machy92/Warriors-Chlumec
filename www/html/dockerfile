@@ -4,10 +4,10 @@ FROM php:8.1-apache
 RUN a2enmod rewrite
 
 # Nastavení výchozí pracovní složky
-WORKDIR /var
+WORKDIR /var/www/html
 
 # Zkopírování obsahu do Apache rootu
-COPY . /var/www/html
+COPY . /var
 
 # Nastavení oprávnění
 RUN chown -R www-data:www-data /var/www/html && \
