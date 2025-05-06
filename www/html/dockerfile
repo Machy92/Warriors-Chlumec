@@ -4,7 +4,7 @@ FROM php:8.1-apache
 RUN a2enmod rewrite
 
 # Nastavení výchozí pracovní složky
-WORKDIR /var/www/html
+WORKDIR /var
 
 # Zkopírování obsahu do Apache rootu
 COPY . /var/www/html
