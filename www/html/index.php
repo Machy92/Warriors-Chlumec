@@ -92,23 +92,26 @@ usort($goalies, function($a, $b) {
             max-width: 1.7rem;
         }
         @media (max-width: 992px) {
-            .players-grid .card {
-                max-width: 14rem;
-                transform: scale(0.95);
-            }
-        }
-        @media (max-width: 768px) {
-            .players-grid .card {
-                max-width: 12rem;
-                transform: scale(0.9);
-            }
-        }
-        @media (max-width: 576px) {
-       .players-grid .card {
-        max-width: 19rem;
-        transform: scale(1.25);
-            }
-        }
+    .players-grid .card {
+        max-width: 16rem;
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 768px) {
+    .players-grid .card {
+        max-width: 18rem;
+        transform: scale(1);
+    }
+}
+
+@media (max-width: 576px) {
+    .players-grid .card {
+        max-width: 100%;
+        transform: scale(1);
+    }
+}
+
 
 
     </style>
