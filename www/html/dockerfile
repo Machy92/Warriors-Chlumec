@@ -8,7 +8,7 @@ RUN a2enmod rewrite
 WORKDIR /var
 
 # Zkopírování obsahu do Apache rootu
-COPY . /var/www/html
+COPY . /var
 
 # Nastavení oprávnění
 RUN chown -R www-data:www-data /var/www/html && \
