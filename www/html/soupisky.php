@@ -107,7 +107,7 @@ foreach ($hraci as $hrac) {
             <div class="team-header"><?= $pozice_nazev ?></div>
             <div class="row g-4">
                 <?php foreach ($rozdelene[$pozice_klic] as $hrac): ?>
-                    <div class="col-12 col-sm-6 col-md-4 col-lg-3 d-flex">
+                    <div class="col-6 col-sm-6 col-md-4 col-lg-3 d-flex">
                         <div class="player-card w-100">
                             <img src="<?= htmlspecialchars($hrac['photo']) ?>" alt="<?= htmlspecialchars($hrac['name']) ?>">
                             <div class="player-name"><?= htmlspecialchars($hrac['name']) ?></div>
