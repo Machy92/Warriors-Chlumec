@@ -89,7 +89,7 @@ usort($goalies, function($a, $b) {
         }
         .players-grid .card {
             width: 100%;
-            max-width: 1rem;
+            max-width: 1.7rem;
         }
         @media (max-width: 992px) {
             .players-grid .card {
@@ -105,8 +105,8 @@ usort($goalies, function($a, $b) {
         }
         @media (max-width: 576px) {
        .players-grid .card {
-        max-width: 14rem;
-        transform: scale(0.95);
+        max-width: 19rem;
+        transform: scale(1.25);
             }
         }
 
