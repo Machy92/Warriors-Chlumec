@@ -43,6 +43,7 @@ usort($goalies, function($a, $b) {
             margin: 0;
             padding: 0;
             background-color: #f8f9fa;
+            padding-bottom: 80px; /* místo pro footer */
         }
         .carousel-item img {
             height: 400px;
@@ -82,7 +83,7 @@ usort($goalies, function($a, $b) {
 
         .players-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1.5rem;
             justify-items: center;
             margin-top: 1.5rem;
@@ -91,6 +92,12 @@ usort($goalies, function($a, $b) {
         .players-grid .card {
             width: 100%;
             max-width: 16rem;
+        }
+
+        .card-img-top {
+            height: 200px;
+            object-fit: cover;
+            transition: transform 0.3s ease-in-out;
         }
 
         @media (max-width: 992px) {
@@ -112,6 +119,16 @@ usort($goalies, function($a, $b) {
             .players-grid .card {
                 max-width: 10rem;
             }
+        }
+
+        footer {
+            background-color: #212529;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            position: relative;
+            bottom: 0;
+            width: 100%;
         }
     </style>
     <script>
@@ -187,7 +204,7 @@ usort($goalies, function($a, $b) {
     <div class="players-grid">
         <?php foreach (array_slice($skaters, 0, 3) as $player): ?>
             <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($player['slug']) ?>'">
-                <img src="<?= htmlspecialchars($player['photo']) ?>" class="card-img-top" alt="<?= htmlspecialchars($player['name']) ?>" style="height: 200px; object-fit: cover;">
+                <img src="<?= htmlspecialchars($player['photo']) ?>" class="card-img-top" alt="<?= htmlspecialchars($player['name']) ?>">
                 <div class="card-body text-center">
                     <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($player['name']) ?> </h6>
                     <p class="card-text" style="font-size: 1rem;">Góly: <strong><?= htmlspecialchars($player['goals']) ?></strong></p>
@@ -200,7 +217,7 @@ usort($goalies, function($a, $b) {
     <div class="players-grid">
         <?php foreach (array_slice($goalies, 0, 3) as $goalie): ?>
             <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($goalie['slug']) ?>'">
-                <img src="<?= htmlspecialchars($goalie['photo']) ?>" class="card-img-top" alt="<?= htmlspecialchars($goalie['name']) ?>" style="height: 200px; object-fit: cover;">
+                <img src="<?= htmlspecialchars($goalie['photo']) ?>" class="card-img-top" alt="<?= htmlspecialchars($goalie['name']) ?>">
                 <div class="card-body text-center">
                     <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($goalie['name']) ?> </h6>
                     <p class="card-text" style="font-size: 1rem;">Úspěšnost zákroků: <strong><?= htmlspecialchars(number_format($goalie['save_pct'], 2)) ?>%</strong></p>
