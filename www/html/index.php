@@ -83,13 +83,13 @@ usort($goalies, function($a, $b) {
         .players-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
+            gap: 1rem;
             justify-items: center;
             margin-top: 1.5rem;
         }
         .players-grid .card {
             width: 100%;
-            max-width: 16rem;
+            max-width: 1rem;
         }
         @media (max-width: 992px) {
             .players-grid .card {
@@ -104,11 +104,13 @@ usort($goalies, function($a, $b) {
             }
         }
         @media (max-width: 576px) {
-            .players-grid .card {
-                max-width: 10rem;
-                transform: scale(0.85);
+       .players-grid .card {
+        max-width: 14rem;
+        transform: scale(0.95);
             }
         }
+
+
     </style>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
