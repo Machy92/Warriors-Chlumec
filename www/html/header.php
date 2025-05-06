@@ -46,21 +46,22 @@
   }
 
   .triangle-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 150%;
-    height: 100px;
-    background: linear-gradient(115deg, #d32f2f 30%, #000 30%);
-    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-    z-index: -1;
-    animation: fadeInDown 1s ease-out;
-  }
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%; /* opraveno z 150% */
+  height: 100px;
+  background: linear-gradient(115deg, #d32f2f 30%, #000 30%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  z-index: -1;
+  animation: fadeInDown 1s ease-out;
+}
 
-  .header.logged-in .triangle-bg {
-    height: 100px;
-    transform: translateX(-3%);
-  }
+.header.logged-in .triangle-bg {
+  height: 100px;
+  /* odstraněn transform: translateX(-3%) */
+}
+
 
   .header-content {
     max-width: 1200px;
