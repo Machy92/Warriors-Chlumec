@@ -1,18 +1,23 @@
+version: '3.8'
+
 services:
   php-apache:
     build:
       context: .
-      dockerfile: dockerfile
+      dockerfile: Dockerfile
+    container_name: warriors_php_apache
     volumes:
       - ./www/html:/var/www/html
     ports:
-      - "8083:80"
+      - "8080:80"
     depends_on:
       - postgres
+    networks:
+      - warriors-net
 
   postgres:
     image: postgres:latest
-    container_name: postgres_server2
+    container_name: warriors_postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -21,19 +26,26 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - warriors_pgdata:/var/lib/postgresql/data
+    networks:
+      - warriors-net
 
   phppgadmin:
     image: dpage/pgadmin4
-    container_name: phppgadmin2
+    container_name: warriors_pgadmin
     restart: always
-    depends_on:
-      - postgres
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "8082:80"
+    depends_on:
+      - postgres
+    networks:
+      - warriors-net
 
 volumes:
-  postgres_data:
+  warriors_pgdata:
+
+networks:
+  warriors-net:

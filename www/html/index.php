@@ -182,7 +182,7 @@ usort($goalies, function($a, $b) {
         <span class="visually-hidden">Další</span>
     </button>
 </div>
-
+ 
 <main class="container text-center pb-5">
     <h3 class="mt-4 section-title text-uppercase">Nejúspěšnější hráči</h3>
     <div class="players-grid">
