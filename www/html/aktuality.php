@@ -1,14 +1,4 @@
-<?php
-session_start();
-require 'db.php';
 
-$stmt = $conn->query("SELECT a.id, a.title, a.content, u.jmeno, u.prijmeni, a.created_at 
-                      FROM articles a 
-                      JOIN users u ON a.author_id = u.id 
-                      ORDER BY a.created_at DESC");
-
-$articles = $stmt->fetchAll(PDO::FETCH_ASSOC);
-?>
 
 <!DOCTYPE html>
 <html lang="cs">

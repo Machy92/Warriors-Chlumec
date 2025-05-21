@@ -1,3 +1,32 @@
+<?php
+
+
+// Supabase přístup
+$supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
+$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // ← sem doplň svůj veřejný anon klíč
+
+function isAdmin($supabaseUrl, $supabaseKey, $userId) {
+    $headers = [
+        "apikey: $supabaseKey",
+        "Authorization: Bearer $supabaseKey",
+        "Content-Type: application/json"
+    ];
+
+    $ch = curl_init("$supabaseUrl/rest/v1/profiles?user_id=eq.$userId&select=pozice");
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers
+    ]);
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+
+    return isset($data[0]['pozice']) && $data[0]['pozice'] === 'admin';
+}
+?>
+
 <header class="header <?php if (isset($_SESSION["user_id"])) echo 'logged-in'; ?>">
   <div class="triangle-bg"></div>
   <div class="header-content">
@@ -13,8 +42,14 @@
         <li><a href="aktuality.php">Aktuality</a></li>
         <li><a href="multimedia.php">Fotogalerie</a></li>
         <li><a href="klubova-historie.php">Klub</a></li>
+
         <?php if (isset($_SESSION["user_id"])): ?>
           <li><a href="profil.php">Profil</a></li>
+
+          <?php if (isAdmin($supabaseUrl, $supabaseKey, $_SESSION["user_id"])): ?>
+            <li><a href="admin_register.php">Admin</a></li>
+          <?php endif; ?>
+
           <li><a href="logout.php">Odhlásit</a></li>
         <?php else: ?>
           <li><a href="login.php">Přihlášení</a></li>
@@ -46,22 +81,20 @@
   }
 
   .triangle-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%; /* opraveno z 150% */
-  height: 100px;
-  background: linear-gradient(115deg, #d32f2f 30%, #000 30%);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-  z-index: -1;
-  animation: fadeInDown 1s ease-out;
-}
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(115deg, #d32f2f 30%, #000 30%);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+    z-index: -1;
+    animation: fadeInDown 1s ease-out;
+  }
 
-.header.logged-in .triangle-bg {
-  height: 100px;
-  /* odstraněn transform: translateX(-3%) */
-}
-
+  .header.logged-in .triangle-bg {
+    height: 100px;
+  }
 
   .header-content {
     max-width: 1200px;

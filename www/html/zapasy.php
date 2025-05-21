@@ -1,5 +1,5 @@
 <?php
-session_start();
+
 require 'db.php';
 try {
     $conn = new PDO("pgsql:host=$host;dbname=$dbname", $user, $password);

@@ -1,97 +1,69 @@
 <?php
 session_start();
 
-if (!isset($_SESSION["user_id"])) {
+if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-$host = "postgres";
-$dbname = "warriorschlumec";
-$user = "postgres";
-$password = "qwerty";
+$supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
+$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // anonymní klíč
 
-try {
-    $conn = new PDO("pgsql:host=$host;dbname=$dbname", $user, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Chyba připojení: " . $e->getMessage());
+$userId = $_SESSION['user_id'];
+$headers = [
+    "apikey: $supabaseKey",
+    "Authorization: Bearer $supabaseKey",
+    "Content-Type: application/json"
+];
+
+// 1. Získání profilu
+$ch = curl_init("$supabaseUrl/rest/v1/user_profiles_with_email?user_id=eq.$userId&select=jmeno,pozice,vytvoreno,email");
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => $headers
+]);
+$response = curl_exec($ch);
+curl_close($ch);
+
+$data = json_decode($response, true);
+$profile = $data[0] ?? null;
+
+if (!$profile) {
+    $error = "Nepodařilo se načíst profil.";
 }
 
-// Načtení údajů o uživateli včetně jména a příjmení
-$stmt = $conn->prepare("SELECT email, jmeno, prijmeni FROM users WHERE id = :id");
-$stmt->bindParam(':id', $_SESSION["user_id"]);
-$stmt->execute();
-$user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-$profileImage = "images/default.png"; // Zatím pevně nastavená profilovka
 ?>
-
 
 <!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Profil uživatele</title>
+    <link rel="icon" type="image/x-icon" href="chlumeclogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .profile-container {
-            min-height: calc(100vh - 100px); /* Odsazení od footeru */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .profile-card {
-            max-width: 500px;
-            width: 100%;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-        .profile-img {
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin-bottom: 20px;
-            border: 4px solid #ddd;
-        }
-        .card-title {
-            font-size: 2rem;
-            font-weight: 600;
-            margin-bottom: 20px;
-        }
-        .card-body {
-            padding: 40px;
-            text-align: center;
-        }
-        .btn-danger {
-            width: 100%;
-            padding: 12px;
-            font-size: 18px;
-            margin-top: 20px;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <?php include 'header.php'; ?>
 
-<?php include 'header.php'; ?>
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">Profil uživatele</h2>
 
-<div class="container profile-container">
-    <div class="card profile-card">
-        <div class="card-body">
-            <img src="<?= $profileImage ?>" alt="Profilová fotka" class="profile-img">
-            <h3 class="card-title"><?= htmlspecialchars($user["jmeno"] . " " . $user["prijmeni"]) ?></h3>
-            <p><strong>Email:</strong> <?= htmlspecialchars($user["email"]) ?></p>
-            <a href="logout.php" class="btn btn-danger mb-2">Odhlásit se</a>
-            <br>
-            <a href="change-password.php" class="btn btn-danger">Změnit heslo</a>
-
-        </div>
+        <?php if (isset($error)): ?>
+            <div class="alert alert-danger text-center"><?= htmlspecialchars($error) ?></div>
+        <?php else: ?>
+            <div class="card mx-auto" style="max-width: 500px;">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fa fa-user"></i> <?= htmlspecialchars($profile['jmeno']) ?></h5>
+                    <p class="card-text"><strong>Pozice:</strong> <?= htmlspecialchars($profile['pozice']) ?></p>
+                    <p class="card-text"><strong>E-mail:</strong> <?= htmlspecialchars($profile['email'] ?? 'Neuveden') ?></p>
+                    <p class="card-text"><strong>Datum registrace:</strong> <?= htmlspecialchars(date('d.m.Y H:i', strtotime($profile['vytvoreno']))) ?></p>
+                    <a href="logout.php" class="btn btn-outline-danger mt-3">Odhlásit se</a>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
-</div>
 
-<?php include 'footer.php'; ?>
-
+    <?php include 'footer.php'; ?>
 </body>
 </html>

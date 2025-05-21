@@ -1,37 +1,3 @@
-<?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-require 'db.php';
-
-if (!isset($_SESSION["user_id"])) {
-    die("Přístup zamítnut. Musíte být přihlášeni.");
-}
-
-$id = $_GET["id"] ?? null;
-if (!$id) die("Chybějící ID článku");
-
-$stmt = $conn->prepare("SELECT * FROM articles WHERE id = ?");
-$stmt->execute([$id]);
-$article = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$article) die("Článek nenalezen.");
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $title = $_POST["title"] ?? '';
-    $content = $_POST["content"] ?? '';
-
-    if (!empty($title) && !empty($content)) {
-        $stmt = $conn->prepare("UPDATE articles SET title = ?, content = ? WHERE id = ?");
-        $stmt->execute([$title, $content, $id]);
-
-        header("Location: aktuality.php");
-        exit();
-    } else {
-        $error_message = "Vyplňte všechna pole!";
-    }
-}
-?>
 
 <!DOCTYPE html>
 <html lang="cs">

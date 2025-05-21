@@ -1,29 +1,4 @@
-<?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-require 'db.php';
 
-if (!isset($_SESSION["user_id"])) {
-    die("Přístup zamítnut. Musíte být přihlášeni.");
-}
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $title = $_POST["title"] ?? '';
-    $content = $_POST["content"] ?? '';
-    $author_id = $_SESSION["user_id"];
-
-    if (!empty($title) && !empty($content)) {
-        $stmt = $conn->prepare("INSERT INTO articles (title, content, author_id, created_at) VALUES (?, ?, ?, NOW())");
-        $stmt->execute([$title, $content, $author_id]);
-
-        header("Location: aktuality.php");
-        exit();
-    } else {
-        $error_message = "Vyplňte všechna pole!";
-    }
-}
-?>
 
 <!DOCTYPE html>
 <html lang="cs">

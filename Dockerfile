@@ -3,10 +3,15 @@ FROM php:8.1-apache
 # Povolení modulu rewrite
 RUN a2enmod rewrite
 
-# Nastavení výchozí pracovní složky
+# Nainstaluj PostgreSQL PDO a další závislosti
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    && docker-php-ext-install pdo pdo_pgsql pgsql
+
+# Nastavení pracovní složky
 WORKDIR /var/www/html
 
-# Zkopírování obsahu do Apache rootu
+# Zkopírování souborů
 COPY . /var/www/html
 
 # Nastavení oprávnění
