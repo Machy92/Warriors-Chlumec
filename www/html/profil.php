@@ -36,6 +36,7 @@ if (!$profile) {
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Profil uživatele</title>
     <link rel="icon" href="chlumeclogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -45,9 +46,9 @@ if (!$profile) {
 <body>
     <?php include 'header.php'; ?>
 
-    <div class="container mt-5">
+    <div class="container mt-5 mb-5">
         <div class="row justify-content-center">
-            <div class="col-md-8 col-lg-6">
+            <div class="col-sm-12 col-md-8 col-lg-6">
                 <h2 class="text-center mb-4">Profil uživatele</h2>
 
                 <?php if (isset($error)): ?>
@@ -72,21 +73,23 @@ if (!$profile) {
                                     <strong> Datum registrace:</strong> <?= htmlspecialchars(date('d.m.Y H:i', strtotime($profile['vytvoreno']))) ?>
                                 </li>
                             </ul>
+
                             <div class="d-grid gap-2 mt-4">
-                                <button class="btn btn-warning mt-3" onclick="document.getElementById('changePasswordForm').style.display='block'">
-                                <i class="fa-solid fa-key"></i> Změnit heslo</button>
+                                <button class="btn btn-warning" onclick="document.getElementById('changePasswordForm').style.display='block'">
+                                    <i class="fa-solid fa-key"></i> Změnit heslo
+                                </button>
 
                                 <div id="changePasswordForm" class="mt-4" style="display:none;">
-                                <form method="post" action="change_password.php">
-                               <div class="mb-3">
-                                 <label for="new_password" class="form-label">Nové heslo</label>
-                                  <input type="password" name="new_password" id="new_password" class="form-control" required minlength="6">
-                                  </div>
-                                   <button type="submit" class="btn btn-success">Změnit heslo</button>
+                                    <form method="post" action="change_password.php">
+                                        <div class="mb-3">
+                                            <label for="new_password" class="form-label">Nové heslo</label>
+                                            <input type="password" name="new_password" id="new_password" class="form-control" required minlength="6">
+                                        </div>
+                                        <button type="submit" class="btn btn-success">Změnit heslo</button>
                                     </form>
                                 </div>
 
-                                <a href="logout.php" class="btn btn-outline-danger">
+                                <a href="logout.php" class="btn btn-outline-danger mt-3">
                                     <i class="fa-solid fa-right-from-bracket"></i> Odhlásit se
                                 </a>
                             </div>
@@ -98,5 +101,8 @@ if (!$profile) {
     </div>
 
     <?php include 'footer.php'; ?>
+
+    <!-- Bootstrap JS (volitelně pro některé komponenty) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
