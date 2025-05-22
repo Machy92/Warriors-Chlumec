@@ -1,33 +1,4 @@
-<?php
-
-
-// Supabase přístup
-$supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
-$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // ← sem doplň svůj veřejný anon klíč
-
-function isAdmin($supabaseUrl, $supabaseKey, $userId) {
-    $headers = [
-        "apikey: $supabaseKey",
-        "Authorization: Bearer $supabaseKey",
-        "Content-Type: application/json"
-    ];
-
-    $ch = curl_init("$supabaseUrl/rest/v1/profiles?user_id=eq.$userId&select=pozice");
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers
-    ]);
-
-    $response = curl_exec($ch);
-    curl_close($ch);
-
-    $data = json_decode($response, true);
-
-    return isset($data[0]['pozice']) && $data[0]['pozice'] === 'admin';
-}
-?>
-
-<header class="header <?php if (isset($_SESSION["user_id"])) echo 'logged-in'; ?>">
+<header class="header <?php if (isset($_SESSION["user_id"])) echo 'logged-in'; ?>">  
   <div class="triangle-bg"></div>
   <div class="header-content">
     <div class="logo">
@@ -42,14 +13,11 @@ function isAdmin($supabaseUrl, $supabaseKey, $userId) {
         <li><a href="aktuality.php">Aktuality</a></li>
         <li><a href="multimedia.php">Fotogalerie</a></li>
         <li><a href="klubova-historie.php">Klub</a></li>
-
         <?php if (isset($_SESSION["user_id"])): ?>
-          <li><a href="profil.php">Profil</a></li>
-
-          <?php if (isAdmin($supabaseUrl, $supabaseKey, $_SESSION["user_id"])): ?>
-            <li><a href="admin_register.php">Admin</a></li>
+          <?php if (isset($_SESSION["pozice"]) && $_SESSION["pozice"] === "admin"): ?>
+            <li><a href="sprava_uzivatelu.php">Správa</a></li>
           <?php endif; ?>
-
+          <li><a href="profil.php">Profil</a></li> 
           <li><a href="logout.php">Odhlásit</a></li>
         <?php else: ?>
           <li><a href="login.php">Přihlášení</a></li>
@@ -86,14 +54,16 @@ function isAdmin($supabaseUrl, $supabaseKey, $userId) {
     left: 0;
     width: 100%;
     height: 100px;
-    background: linear-gradient(115deg, #d32f2f 30%, #000 30%);
+    background: linear-gradient(115deg, #d32f2f 210px, #000 210px);
     clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
-    z-index: -1;
+    z-index: 0;
     animation: fadeInDown 1s ease-out;
   }
 
-  .header.logged-in .triangle-bg {
-    height: 100px;
+  @media (max-width: 768px) {
+    .triangle-bg {
+      background: linear-gradient(115deg, #d32f2f 80px, #000 80px);
+    }
   }
 
   .header-content {
@@ -104,6 +74,8 @@ function isAdmin($supabaseUrl, $supabaseKey, $userId) {
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
+    position: relative;
+    z-index: 1;
   }
 
   .logo img {
@@ -148,7 +120,8 @@ function isAdmin($supabaseUrl, $supabaseKey, $userId) {
     z-index: 1001;
   }
 
-  @media (max-width: 768px) {
+  /* nový breakpoint pro burger menu při 1035px */
+  @media (max-width: 1035px) {
     .menu-toggle {
       display: block;
     }
@@ -173,6 +146,13 @@ function isAdmin($supabaseUrl, $supabaseKey, $userId) {
       flex-direction: column;
       align-items: center;
       gap: 10px;
+    }
+  }
+
+  /* zachováme původní pro menší než 768px aby se gradient změnil */
+  @media (max-width: 768px) {
+    .triangle-bg {
+      background: linear-gradient(115deg, #d32f2f 80px, #000 80px);
     }
   }
 
@@ -210,7 +190,7 @@ function isAdmin($supabaseUrl, $supabaseKey, $userId) {
 
     document.querySelectorAll(".menu a").forEach(link => {
       link.addEventListener("click", () => {
-        if (window.innerWidth <= 768) {
+        if (window.innerWidth <= 1035) {
           menu.classList.remove("active");
         }
       });

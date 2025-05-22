@@ -2,7 +2,7 @@
 session_start();
 
 $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
-$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // zkráceno pro přehlednost
+$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzY0MDIxMywiZXhwIjoyMDYzMjE2MjEzfQ.j5P0CgFejLb99zkwP-4SdUZ6IC-z8HvCY9D0JL0ovWQ';
 
 $error = '';
 
@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         "Content-Type: application/json"
     ];
 
+    // 1) Přihlášení přes Supabase Auth
     $data = json_encode([
         "email" => $email,
         "password" => $password
@@ -36,6 +37,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($result['access_token']) && isset($result['user']['id'])) {
         $_SESSION['user_id'] = $result['user']['id'];
+        $_SESSION['user_email'] = $result['user']['email'];
+
+        // 2) Načtení role (pozice) z tabulky `profiles`
+        $userId = $result['user']['id'];
+        $queryUrl = "$supabaseUrl/rest/v1/profiles?user_id=eq.$userId&select=pozice";
+
+        $ch2 = curl_init($queryUrl);
+        curl_setopt_array($ch2, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "apikey: $supabaseKey",
+                "Authorization: Bearer $supabaseKey",
+                "Content-Type: application/json",
+                "Prefer: return=representation"
+            ]
+        ]);
+
+        $response2 = curl_exec($ch2);
+        curl_close($ch2);
+
+        $profileData = json_decode($response2, true);
+
+        if (!empty($profileData) && isset($profileData[0]['pozice'])) {
+            $_SESSION['pozice'] = $profileData[0]['pozice'];
+        } else {
+            $_SESSION['pozice'] = null; // Bez role
+        }
+
         header("Location: profil.php");
         exit;
     } else {
@@ -43,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="cs">
