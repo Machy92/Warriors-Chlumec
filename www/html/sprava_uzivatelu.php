@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id'])) {
 // === NASTAVENÍ SUPABASE ===
 $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
 // POZOR: Použijte svůj tajný service_role klíč!
-$supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; 
+$supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzY0MDIxMywiZXhwIjoyMDYzMjE2MjEzfQ.j5P0CgFejLb99zkwP-4SdUZ6IC-z8HvCY9D0JL0ovWQ'; 
 
 $userId = $_SESSION['user_id'];
 
@@ -113,7 +113,7 @@ $users = json_decode($usersResponse, true);
         </div>
         <div class="card-body">
             <?php echo $inviteMessage; // Zobrazení zprávy o úspěchu/neúspěchu pozvánky ?>
-            <form method="POST" action="sprava-uzivatelu.php">
+            <form method="POST" action="sprava_uzivatelu.php">
                 <div class="mb-3">
                     <label for="jmeno" class="form-label">Jméno a příjmení</label>
                     <input type="text" class="form-control" id="jmeno" name="jmeno" required>
