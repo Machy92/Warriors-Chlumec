@@ -22,8 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nadpis = $_POST['nadpis'] ?? '';
     $obsah = $_POST['obsah'] ?? '';
     $obrazek_url = $_POST['obrazek_url'] ?? '';
-    $autor = $_SESSION['username'] ?? 'Neznámý'; // nebo použij třeba $_SESSION['user_email']
-
+$autor = $_SESSION['user_id'] ?? null;
     if (!empty($nadpis) && !empty($obsah)) {
         $data = json_encode([
             'nadpis' => $nadpis,
