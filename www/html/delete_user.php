@@ -19,7 +19,7 @@ $userToDeleteId = $_GET['id'];
 
 // Nelze smazat sám sebe
 if ($adminUserId === $userToDeleteId) {
-    header("Location: sprava_uzivatelu.php?delete=error");
+    header("Location: sprava-uzivatelu.php?delete=error");
     exit;
 }
 
