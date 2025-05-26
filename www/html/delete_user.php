@@ -19,7 +19,7 @@ $userToDeleteId = $_GET['id'];
 
 // Nelze smazat sám sebe
 if ($adminUserId === $userToDeleteId) {
-    header("Location: sprava-uzivatelu.php?delete=error");
+    header("Location: sprava_uzivatelu.php?delete=error");
     exit;
 }
 
@@ -43,8 +43,8 @@ curl_close($ch);
 
 // Přesměrování zpět na stránku správy s výsledkem
 if ($httpcode == 200) {
-    header("Location: sprava-uzivatelu.php?delete=ok");
+    header("Location: sprava_uzivatelu.php?delete=ok");
 } else {
-    header("Location: sprava-uzivatelu.php?delete=error");
+    header("Location: sprava_uzivatelu.php?delete=error");
 }
 exit;
