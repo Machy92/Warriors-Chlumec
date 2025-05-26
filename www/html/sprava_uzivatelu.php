@@ -78,8 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invite_user'])) {
 
 
 // === NAČTENÍ VŠECH UŽIVATELŮ PRO ZOBRAZENÍ V TABULCE ===
-// Pro načtení všech profilů použijeme RPC (Remote Procedure Call) na funkci, která spojí auth.users a public.profiles
-// Tuto funkci si musíte vytvořit v Supabase -> viz další krok
 $ch_users = curl_init("$supabaseUrl/rest/v1/rpc/get_all_users_with_profiles");
 curl_setopt_array($ch_users, [
     CURLOPT_RETURNTRANSFER => true,
@@ -95,6 +93,7 @@ $users = json_decode($usersResponse, true);
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Správa uživatelů</title>
     <link rel="icon" href="chlumeclogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -114,13 +113,15 @@ $users = json_decode($usersResponse, true);
         <div class="card-body">
             <?php echo $inviteMessage; // Zobrazení zprávy o úspěchu/neúspěchu pozvánky ?>
             <form method="POST" action="sprava_uzivatelu.php">
-                <div class="mb-3">
-                    <label for="jmeno" class="form-label">Jméno a příjmení</label>
-                    <input type="text" class="form-control" id="jmeno" name="jmeno" required>
-                </div>
-                <div class="mb-3">
-                    <label for="email" class="form-label">E-mail</label>
-                    <input type="email" class="form-control" id="email" name="email" required>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="jmeno" class="form-label">Jméno a příjmení</label>
+                        <input type="text" class="form-control" id="jmeno" name="jmeno" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="email" class="form-label">E-mail</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
                 </div>
                  <div class="mb-3">
                     <label for="pozice" class="form-label">Pozice</label>
@@ -146,14 +147,14 @@ $users = json_decode($usersResponse, true);
             <?php endif; ?>
 
             <div class="table-responsive">
-                <table class="table table-striped table-hover">
+                <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
                             <th>Jméno</th>
                             <th>Email</th>
                             <th>Pozice</th>
-                            <th>Role</th>
-                            <th>Registrován</th>
+                            <th class="d-none d-md-table-cell">Role</th>
+                            <th class="d-none d-lg-table-cell">Registrován</th>
                             <th>Akce</th>
                         </tr>
                     </thead>
@@ -166,13 +167,14 @@ $users = json_decode($usersResponse, true);
                                     <td><?= htmlspecialchars($user['jmeno'] ?? 'N/A') ?></td>
                                     <td><?= htmlspecialchars($user['email']) ?></td>
                                     <td><?= htmlspecialchars($user['pozice'] ?? 'N/A') ?></td>
-                                    <td><span class="badge bg-secondary"><?= htmlspecialchars($user['role'] ?? 'user') ?></span></td>
-                                    <td><?= date('d.m.Y', strtotime($user['created_at'])) ?></td>
+                                    <td class="d-none d-md-table-cell"><span class="badge bg-secondary"><?= htmlspecialchars($user['role'] ?? 'user') ?></span></td>
+                                    <td class="d-none d-lg-table-cell"><?= date('d.m.Y', strtotime($user['created_at'])) ?></td>
                                     <td>
                                         <?php if ($user['id'] !== $userId): ?>
                                         <a href="delete_user.php?id=<?= htmlspecialchars($user['id']) ?>" 
                                            class="btn btn-danger btn-sm"
-                                           onclick="return confirm('Opravdu chcete smazat tohoto uživatele? Tato akce je nevratná.');">
+                                           onclick="return confirm('Opravdu chcete smazat tohoto uživatele? Tato akce je nevratná.');"
+                                           aria-label="Smazat uživatele">
                                             <i class="fa-solid fa-trash"></i>
                                         </a>
                                         <?php endif; ?>

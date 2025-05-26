@@ -7,7 +7,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
-$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE';$userId = $_SESSION['user_id'];
+$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE';
+$userId = $_SESSION['user_id'];
 
 $headers = [
     "apikey: $supabaseKey",
@@ -36,6 +37,7 @@ if (!$profile) {
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profil uživatele</title>
     <link rel="icon" href="chlumeclogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -47,10 +49,7 @@ if (!$profile) {
 
 <div class="container mt-5 mb-5">
     <div class="row justify-content-center">
-        <div class="col-sm-12 col-md-8 col-lg-6">
-
-            <!-- Výpis hlášek -->
-            <?php if (isset($_GET['heslo'])): ?>
+        <div class="col-11 col-md-8 col-lg-6"> <?php if (isset($_GET['heslo'])): ?>
                 <?php if ($_GET['heslo'] === 'ok'): ?>
                     <div class="alert alert-success text-center">Heslo bylo úspěšně změněno.</div>
                 <?php else: ?>
@@ -64,31 +63,30 @@ if (!$profile) {
                 <div class="alert alert-danger text-center"><?= htmlspecialchars($error) ?></div>
             <?php else: ?>
                 <div class="card shadow rounded">
-                    <div class="card-body">
-                        <h5 class="card-title text-center mb-3">
-                            <i class="fa-solid fa-user"></i> <?= htmlspecialchars($profile['jmeno']) ?>
+                    <div class="card-body p-4">
+                        <h5 class="card-title text-center mb-4"> <i class="fa-solid fa-user"></i> <?= htmlspecialchars($profile['jmeno']) ?>
                         </h5>
                         <ul class="list-group list-group-flush">
                             <li class="list-group-item">
-                                <i class="fa-solid fa-briefcase"></i>
-                                <strong> Pozice:</strong> <?= htmlspecialchars($profile['pozice']) ?>
+                                <i class="fa-solid fa-briefcase text-muted me-2"></i> <strong>Pozice:</strong> <?= htmlspecialchars($profile['pozice']) ?>
                             </li>
                             <li class="list-group-item">
-                                <i class="fa-solid fa-envelope"></i>
-                                <strong> E-mail:</strong> <?= htmlspecialchars($profile['email'] ?? 'Neuveden') ?>
+                                <i class="fa-solid fa-envelope text-muted me-2"></i>
+                                <strong>E-mail:</strong> <?= htmlspecialchars($profile['email'] ?? 'Neuveden') ?>
                             </li>
                             <li class="list-group-item">
-                                <i class="fa-solid fa-calendar-plus"></i>
-                                <strong> Datum registrace:</strong> <?= htmlspecialchars(date('d.m.Y H:i', strtotime($profile['vytvoreno']))) ?>
+                                <i class="fa-solid fa-calendar-plus text-muted me-2"></i>
+                                <strong>Datum registrace:</strong> <?= htmlspecialchars(date('d.m.Y H:i', strtotime($profile['vytvoreno']))) ?>
                             </li>
                         </ul>
 
-                        <div class="d-grid gap-2 mt-4">
-                            <button class="btn btn-warning" onclick="document.getElementById('changePasswordForm').style.display='block'">
+                        <div class="mt-4">
+                            <button class="btn btn-warning w-100" onclick="document.getElementById('changePasswordForm').style.display='block'">
                                 <i class="fa-solid fa-key"></i> Změnit heslo
                             </button>
 
-                            <div id="changePasswordForm" class="mt-4" style="display:none;">
+                            <div id="changePasswordForm" class="mt-4 border p-4 rounded bg-light" style="display:none;">
+                                <h5 class="mb-3">Změna hesla</h5>
                                 <form method="post" action="change_password.php">
                                     <div class="mb-3">
                                         <label for="old_password" class="form-label">Staré heslo</label>
@@ -102,11 +100,11 @@ if (!$profile) {
                                         <label for="confirm_password" class="form-label">Zopakuj nové heslo</label>
                                         <input type="password" name="confirm_password" id="confirm_password" class="form-control" required minlength="6">
                                     </div>
-                                    <button type="submit" class="btn btn-success">Změnit heslo</button>
+                                    <button type="submit" class="btn btn-success">Potvrdit změnu</button>
                                 </form>
                             </div>
 
-                            <a href="logout.php" class="btn btn-outline-danger mt-3">
+                            <a href="logout.php" class="btn btn-outline-danger w-100 mt-3">
                                 <i class="fa-solid fa-right-from-bracket"></i> Odhlásit se
                             </a>
                         </div>
