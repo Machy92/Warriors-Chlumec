@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
 
 $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
 // Zde opět potřebujeme klíč s nejvyššími právy
-$supabaseServiceKey = 'VASE_ZKOPIROVANA_SERVICE_ROLE_HODNOTA'; 
+$supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0NzY0MDIxMywiZXhwIjoyMDYzMjE2MjEzfQ.j5P0CgFejLb99zkwP-4SdUZ6IC-z8HvCY9D0JL0ovWQ'; 
 
 $adminUserId = $_SESSION['user_id'];
 $userToDeleteId = $_GET['id'];
