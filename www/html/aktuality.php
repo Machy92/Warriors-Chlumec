@@ -1,50 +1,31 @@
 <?php
 session_start();
 
+// Databáze a cURL - beze změny
 $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
 $supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE';
-
 $headers = [
     "apikey: $supabaseKey",
-    "Authorization: Bearer $supabaseKey",
+    "Authorization: " . (isset($_SESSION['access_token']) ? "Bearer " . $_SESSION['access_token'] : "Bearer " . $supabaseKey),
     "Content-Type: application/json"
 ];
 
+// ... (zbytek vašeho PHP kódu pro načtení dat zůstává stejný) ...
 // Načtení článků
 $chAktuality = curl_init("$supabaseUrl/rest/v1/aktuality?select=*&order=datum.desc");
-curl_setopt_array($chAktuality, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => $headers
-]);
+curl_setopt_array($chAktuality, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers]);
 $responseAktuality = curl_exec($chAktuality);
-
-// Zkontroluj, zda nedošlo k chybě při cURL požadavku pro aktuality
-if ($responseAktuality === false) {
-    $error = curl_error($chAktuality);
-    curl_close($chAktuality);
-    die("Chyba při načítání aktualit: $error");
-}
-
-$data = json_decode($responseAktuality, true); // články
+if ($responseAktuality === false) { die("Chyba při načítání aktualit: " . curl_error($chAktuality)); }
+$data = json_decode($responseAktuality, true);
 curl_close($chAktuality);
 
 // Načtení profilů
 $chProfiles = curl_init("$supabaseUrl/rest/v1/profiles?select=user_id,jmeno");
-curl_setopt_array($chProfiles, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => $headers
-]);
+curl_setopt_array($chProfiles, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers]);
 $responseProfiles = curl_exec($chProfiles);
-
-// Zkontroluj, zda nedošlo k chybě při cURL požadavku pro profily
-if ($responseProfiles === false) {
-    $error = curl_error($chProfiles);
-    curl_close($chProfiles);
-    die("Chyba při načítání profilů: $error");
-}
-
+if ($responseProfiles === false) { die("Chyba při načítání profilů: " . curl_error($chProfiles)); }
+$profiles = json_decode($responseProfiles, true);
 curl_close($chProfiles);
-$profiles = json_decode($responseProfiles, true); // profily
 
 // Mapování user_id -> jméno
 $autoriMap = [];
@@ -65,6 +46,23 @@ if (is_array($profiles)) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    
+    <style>
+        .card-img-top {
+            height: 200px;
+            width: 100%;
+            object-fit: cover;
+        }
+        .card-text-truncate {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 4; /* Můžete změnit zpět na 2, pokud preferujete */
+            overflow: hidden;
+        }
+        .read-more-btn {
+            display: none; /* Standardně skryté */
+        }
+    </style>
 </head>
 <body>
 <?php include 'header.php'; ?>
@@ -72,26 +70,16 @@ if (is_array($profiles)) {
 <div class="container mt-5 mb-5">
     <h2 class="text-center mb-4">Aktuality</h2>
 
-    <?php if (isset($_GET['zprava'])): ?>
-        <div class="alert alert-success"><?= htmlspecialchars($_GET['zprava']) ?></div>
-    <?php endif; ?>
-
-    <?php if (isset($_GET['zprava_chyba'])): ?>
-        <div class="alert alert-danger"><?= htmlspecialchars($_GET['zprava_chyba']) ?></div>
-    <?php endif; ?>
-
     <?php if (isset($_SESSION['user_id'])): ?>
         <div class="text-center mb-4">
-            <a href="pridat-aktualitu.php" class="btn btn-success">
-                <i class="fa-solid fa-plus"></i> Přidat aktualitu
-            </a>
+            <a href="pridat-aktualitu.php" class="btn btn-success"><i class="fa-solid fa-plus"></i> Přidat aktualitu</a>
         </div>
     <?php endif; ?>
 
     <?php if (empty($data)): ?>
         <p class="text-center">Zatím žádné aktuality.</p>
     <?php else: ?>
-        <div class="row g-4">
+        <div class="row g-4" id="masonry-grid" data-masonry='{"percentPosition": true, "itemSelector": ".grid-item"}'>
             <?php foreach ($data as $clanek): ?>
                 <?php
                     $autor_id = $clanek['autor'] ?? null;
@@ -100,29 +88,50 @@ if (is_array($profiles)) {
                         $autor_jmeno = $autoriMap[$autor_id];
                     }
                 ?>
-                <div class="col-sm-12 col-md-6 col-lg-4">
-                    <div class="card h-100 shadow-sm">
+                <div class="col-sm-6 col-lg-4 mb-4 grid-item">
+                    <div class="card shadow-sm">
                         <?php if (!empty($clanek['obrazek_url'])): ?>
                             <img src="<?= htmlspecialchars($clanek['obrazek_url']) ?>" class="card-img-top" alt="Obrázek článku">
                         <?php endif; ?>
-                        <div class="card-body d-flex flex-column">
+
+                        <div class="card-body">
                             <h5 class="card-title"><?= htmlspecialchars($clanek['nadpis']) ?></h5>
-                            <p class="card-text">
-                                <?= nl2br(htmlspecialchars(mb_substr($clanek['obsah'], 0, 150))) ?>...
+                            <p class="card-text card-text-truncate card-text-content">
+                                <?= nl2br(htmlspecialchars($clanek['obsah'])) ?>
                             </p>
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-auto read-more-btn" data-bs-toggle="modal" data-bs-target="#aktualitaModal-<?= $clanek['id'] ?>">
+                                Číst více
+                            </button>
                         </div>
                         <div class="card-footer text-muted small">
-                            <i class="fa-regular fa-user"></i> <?= htmlspecialchars($autor_jmeno) ?><br>
-                            <i class="fa-regular fa-clock"></i> <?= date('d.m.Y H:i', strtotime($clanek['datum'])) ?>
+                            <div><i class="fa-regular fa-user"></i> <?= htmlspecialchars($autor_jmeno) ?></div>
+                            <div><i class="fa-regular fa-clock"></i> <?= date('d.m.Y H:i', strtotime($clanek['datum'])) ?></div>
                             <?php if (isset($_SESSION['user_id'])): ?>
-                                <br>
-                                <a href="upravit-aktualitu.php?id=<?= htmlspecialchars($clanek['id']) ?>" class="btn btn-primary btn-sm">
-                                    <i class="fa-solid fa-pen-to-square"></i> Upravit
-                                </a>
-                                <a href="smazat-aktualitu.php?id=<?= htmlspecialchars($clanek['id']) ?>" class="btn btn-danger btn-sm ms-2" onclick="return confirm('Opravdu chcete smazat tuto aktualitu?')">
-                                    <i class="fa-solid fa-trash-can"></i> Smazat
-                                </a>
+                                <div class="mt-2">
+                                    <a href="upravit-aktualitu.php?id=<?= htmlspecialchars($clanek['id']) ?>" class="btn btn-secondary btn-sm"><i class="fa-solid fa-pen-to-square"></i> Upravit</a>
+                                    <a href="smazat-aktualitu.php?id=<?= htmlspecialchars($clanek['id']) ?>" class="btn btn-danger btn-sm" onclick="return confirm('Opravdu chcete smazat tuto aktualitu?')"><i class="fa-solid fa-trash-can"></i> Smazat</a>
+                                </div>
                             <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="aktualitaModal-<?= $clanek['id'] ?>" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title"><?= htmlspecialchars($clanek['nadpis']) ?></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                            <div class="modal-body">
+                                <?php if (!empty($clanek['obrazek_url'])): ?>
+                                    <img src="<?= htmlspecialchars($clanek['obrazek_url']) ?>" class="img-fluid rounded mb-3" alt="Obrázek článku">
+                                <?php endif; ?>
+                                <p><?= nl2br(htmlspecialchars($clanek['obsah'])) ?></p>
+                                <hr>
+                                <div class="text-muted small">
+                                    <i class="fa-regular fa-user"></i> <?= htmlspecialchars($autor_jmeno) ?><br>
+                                    <i class="fa-regular fa-clock"></i> <?= date('d.m.Y H:i', strtotime($clanek['datum'])) ?>
+                                </div>
+                            </div>
+                            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zavřít</button></div>
                         </div>
                     </div>
                 </div>
@@ -134,5 +143,52 @@ if (is_array($profiles)) {
 <?php include 'footer.php'; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/masonry-layout@4.2.2/dist/masonry.pkgd.min.js" integrity="sha384-GNFwBvfVxBkLMJpYMOABq3c+d3KnQxudP/mGPkzpZSTYykLBNsZEnG2D9G/X/+7D" crossorigin="anonymous" async></script>
+
+<script>
+    function checkReadMoreButtons() {
+        const textContainers = document.querySelectorAll('.card-text-content');
+        textContainers.forEach(container => {
+            const button = container.parentElement.querySelector('.read-more-btn');
+            if (button) {
+                // Nejprve skryjeme, pokud bylo viditelné
+                button.style.display = 'none';
+                // Zkontrolujeme přetečení
+                if (container.scrollHeight > container.clientHeight) {
+                    button.style.display = 'inline-block';
+                }
+            }
+        });
+    }
+
+    // Spustíme po načtení celého okna (včetně obrázků), což dává Masonry více času
+    window.addEventListener('load', function() {
+        checkReadMoreButtons();
+
+        // Pro jistotu spustíme znovu s malým zpožděním, kdyby Masonry ještě pracovalo
+        setTimeout(function() {
+            checkReadMoreButtons();
+            // Pokusíme se explicitně říct Masonry, aby se znovu rozložil, pokud už existuje
+            var gridElement = document.querySelector('#masonry-grid');
+            if (gridElement && typeof Masonry !== 'undefined' && Masonry.data(gridElement)) {
+                 Masonry.data(gridElement).layout();
+            }
+        }, 500); // 0.5 sekundová prodleva
+    });
+
+    // Aktualizace při změně velikosti okna
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            var gridElement = document.querySelector('#masonry-grid');
+            if (gridElement && typeof Masonry !== 'undefined' && Masonry.data(gridElement)) {
+                 Masonry.data(gridElement).layout();
+            }
+            checkReadMoreButtons();
+        }, 250);
+    });
+</script>
+
 </body>
 </html>
