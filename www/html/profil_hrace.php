@@ -95,7 +95,7 @@ if ($typ_hrace === 'goalie') {
         <p><strong>Věk:</strong> <?= htmlspecialchars($vek) ?></p>
         <p><strong>Datum narození:</strong> <?= htmlspecialchars($datum_narozeni_formatovane) ?></p>
 
-        <h4 class="mt-4">Statistiky sezóny</h4>
+        <h4 class="mt-4">Statistiky sezóny 2024/25</h4>
         <table class="table table-striped stat-table">
             <tbody>
             <?php if ($typ_hrace === 'player'): ?>
