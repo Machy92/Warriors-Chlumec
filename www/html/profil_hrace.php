@@ -1,149 +1,115 @@
 <?php
-session_start();
+function fetchSupabaseData($table, $queryParams) {
+    // #############################################################
+    // ZDE MÁŠ SVÉ ÚDAJE K SUPABASE!
+    // #############################################################
+    $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co'; // Nahraď za své
+    $supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // Nahraď za svůj public anon key
 
-// Načti data z JSON souboru
-$hraci = [];
-$json = file_get_contents('hraci.json');
-
-if ($json !== false) {
-    $hraci = json_decode($json, true);
+    $url = "{$supabaseUrl}/rest/v1/{$table}?{$queryParams}";
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['apikey: ' . $supabaseKey, 'Authorization: Bearer ' . $supabaseKey, 'Prefer: return=representation']);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    return json_decode($response, true);
 }
 
-$slug = $_GET['jmeno'] ?? '';
-$hrac = null;
+$jmeno = $_GET['jmeno'] ?? '';
+if (empty($jmeno)) { die("Nebylo zadáno jméno hráče."); }
 
-// Najdi hráče podle slugu
-foreach ($hraci as $h) {
-    if (isset($h['slug']) && $h['slug'] === $slug) {
-        $hrac = $h;
-        break;
+$hrac = null;
+$typ_hrace = '';
+
+$queryParams = 'select=*&jmeno=eq.' . urlencode($jmeno);
+$data_hrac = fetchSupabaseData('players', $queryParams);
+
+if (!empty($data_hrac)) {
+    $hrac = $data_hrac[0];
+    $typ_hrace = 'player';
+} else {
+    $data_brankar = fetchSupabaseData('goalies', $queryParams);
+    if (!empty($data_brankar)) {
+        $hrac = $data_brankar[0];
+        $typ_hrace = 'goalie';
     }
 }
 
-if (!$hrac) {
-    die("Hráč nenalezen.");
+if (!$hrac) { die("Hráč nebo brankář s tímto jménem nebyl nalezen."); }
+
+// --- VÝPOČET VĚKU A FORMÁTOVÁNÍ DATUMU NAROZENÍ ---
+$vek = 'N/A';
+$datum_narozeni_formatovane = 'N/A';
+if (!empty($hrac['datum_narozeni'])) {
+    try {
+        $datum_narozeni_obj = new DateTime($hrac['datum_narozeni']);
+        $dnes = new DateTime();
+        $rozdil = $dnes->diff($datum_narozeni_obj);
+        $vek = $rozdil->y;
+        $datum_narozeni_formatovane = $datum_narozeni_obj->format('d.m.Y'); // Formát DD.MM.RRRR
+    } catch (Exception $e) {
+        // Pokud by datum narození bylo v neplatném formátu, necháme N/A
+        $vek = 'N/A';
+        $datum_narozeni_formatovane = 'N/A';
+    }
 }
+
+// --- PŘEVOD ZKRATKY POSTU NA CELÝ NÁZEV ---
+$pozice_cele_jmeno = 'Neznámý';
+if ($typ_hrace === 'goalie') {
+    $pozice_cele_jmeno = 'Brankář';
+} elseif (isset($hrac['post'])) {
+    if ($hrac['post'] === 'U') {
+        $pozice_cele_jmeno = 'Útočník';
+    } elseif ($hrac['post'] === 'O') {
+        $pozice_cele_jmeno = 'Obránce';
+    }
+    // Zde můžeš přidat další mapování, pokud by se objevily jiné zkratky
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
-    <title><?= htmlspecialchars($hrac['name']) ?> - Profil hráče</title>
+    <title><?= htmlspecialchars($hrac['jmeno']) ?> - Profil hráče</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            background: #f4f4f4;
-        }
-        .player-profile {
-            max-width: 600px;
-            margin: 20px auto;
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .player-img {
-            width: 150px;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 50%;
-            margin-bottom: 15px;
-        }
-        .stat-table {
-            margin-top: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .player-profile {
-                padding: 15px;
-            }
-
-            .player-img {
-                width: 120px;
-                height: 120px;
-            }
-
-            .stat-table th,
-            .stat-table td {
-                font-size: 14px;
-            }
-
-            h2 {
-                font-size: 24px;
-            }
-
-            p {
-                font-size: 14px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .player-img {
-                width: 100px;
-                height: 100px;
-            }
-
-            h2 {
-                font-size: 20px;
-            }
-
-            .btn {
-                font-size: 14px;
-                padding: 8px 12px;
-            }
-        }
+        body { background: #f4f4f4; }
+        .player-profile { max-width: 600px; margin: 40px auto; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+        .player-img { width: 150px; height: 150px; object-fit: cover; border-radius: 50%; margin-bottom: 15px; border: 3px solid #eee; }
+        .stat-table { margin-top: 20px; text-align: left; }
     </style>
 </head>
 <body>
-
 <?php include 'header.php'; ?>
 
 <div class="container">
     <div class="player-profile">
-        <img src="<?= htmlspecialchars($hrac['photo']) ?>" alt="<?= htmlspecialchars($hrac['name']) ?>" class="player-img">
-        <h2><?= htmlspecialchars($hrac['name']) ?></h2>
-        <p><strong>Pozice:</strong> <?= htmlspecialchars($hrac['position']) ?></p>
-        <p><strong>Číslo dresu:</strong> <?= htmlspecialchars($hrac['number']) ?></p>
-        <p><strong>Věk:</strong> <?= htmlspecialchars($hrac['age']) ?></p>
+        <img src="<?= htmlspecialchars($hrac['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($hrac['jmeno']) ?>" class="player-img">
+        <h2><?= htmlspecialchars($hrac['jmeno']) ?></h2>
+        <p><strong>Pozice:</strong> <?= htmlspecialchars($pozice_cele_jmeno) ?></p>
+        <p><strong>Číslo dresu:</strong> <?= htmlspecialchars($hrac['cislo_dresu'] ?? 'N/A') ?></p>
+        <p><strong>Věk:</strong> <?= htmlspecialchars($vek) ?></p>
+        <p><strong>Datum narození:</strong> <?= htmlspecialchars($datum_narozeni_formatovane) ?></p>
 
+        <h4 class="mt-4">Statistiky sezóny</h4>
         <table class="table table-striped stat-table">
             <tbody>
-            <?php if ($hrac['position'] !== 'Brankář'): ?>
-                <tr>
-                    <th>Odehrané zápasy</th>
-                    <td><?= htmlspecialchars($hrac['matches'] ?? 0) ?></td>
-                </tr>
-                <tr>
-                    <th>Góly</th>
-                    <td><?= htmlspecialchars($hrac['goals'] ?? 0) ?></td>
-                </tr>
-                <tr>
-                    <th>Asistence</th>
-                    <td><?= htmlspecialchars($hrac['assists'] ?? 0) ?></td>
-                </tr>
-                <tr>
-                    <th>Trestné minuty</th>
-                    <td><?= htmlspecialchars($hrac['penalties'] ?? 0) ?></td>
-                </tr>
+            <?php if ($typ_hrace === 'player'): ?>
+                <tr><th>Odehrané zápasy</th><td><?= htmlspecialchars($hrac['zapasy'] ?? 0) ?></td></tr>
+                <tr><th>Góly</th><td><?= htmlspecialchars($hrac['goly'] ?? 0) ?></td></tr>
+                <tr><th>Asistence</th><td><?= htmlspecialchars($hrac['asistence'] ?? 0) ?></td></tr>
+                <tr><th>Body</th><td><?= htmlspecialchars($hrac['body'] ?? 0) ?></td></tr>
+                <tr><th>Trestné minuty</th><td><?= htmlspecialchars($hrac['trestne_minuty'] ?? 0) ?></td></tr>
+            <?php elseif($typ_hrace === 'goalie'): ?>
+                <tr><th>Odehrané zápasy</th><td><?= htmlspecialchars($hrac['zapasy'] ?? 0) ?></td></tr>
+                <tr><th>Odchytané minuty</th><td><?= htmlspecialchars($hrac['odchytane_minuty'] ?? 0) ?></td></tr>
+                <tr><th>Úspěšnost zákroků</th><td><?= htmlspecialchars(number_format($hrac['uspesnost'] ?? 0, 2)) ?> %</td></tr>
+                <tr><th>Trestné minuty</th><td><?= htmlspecialchars($hrac['trestne_minuty'] ?? 0) ?></td></tr>
             <?php else: ?>
-                <tr>
-                    <th>Odehrané minuty</th>
-                    <td><?= htmlspecialchars($hrac['minutes'] ?? 0) ?></td>
-                </tr>
-                <tr>
-                    <th>Úspěšnost zákroků</th>
-                    <td><?= htmlspecialchars($hrac['save_pct'] ?? 0) ?>%</td>
-                </tr>
-                <tr>
-                    <th>Trestné minuty</th>
-                    <td><?= htmlspecialchars($hrac['penalties'] ?? 0) ?></td>
-                </tr>
-                <tr>
-                    <th>Asistence</th>
-                    <td><?= htmlspecialchars($hrac['assists'] ?? 0) ?></td>
-                </tr>
+                <tr><td colspan="2" class="text-center">Statistiky pro tento typ hráče nejsou dostupné.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -153,7 +119,6 @@ if (!$hrac) {
 </div>
 
 <?php include 'footer.php'; ?>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
