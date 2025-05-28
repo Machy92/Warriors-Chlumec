@@ -1,31 +1,46 @@
 <?php
 session_start();
 
-// Načtení hráčů ze souboru JSON
-$players_json = file_get_contents('hraci.json');
-$players = json_decode($players_json, true);
+    $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co'; // Nahraď za své
+    $supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // Nahraď za svůj public anon key
 
-// Rozdělení hráčů na hráče v poli a brankáře
-$skaters = [];
-$goalies = [];
+// Zapnutí zobrazení chyb (pro vývoj, na produkci můžeš zakomentovat nebo smazat)
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
-foreach ($players as $player) {
-    if ($player['position'] === 'Brankář') {
-        $goalies[] = $player;
-    } else {
-        $skaters[] = $player;
+function fetchSupabaseData($table, $queryParams = 'select=*') {
+    global $supabaseUrl, $supabaseKey; // Abychom viděli proměnné zvenku
+
+    $url = "{$supabaseUrl}/rest/v1/{$table}?{$queryParams}";
+    
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'apikey: ' . $supabaseKey,
+        'Authorization: Bearer ' . $supabaseKey,
+        'Prefer: return=representation' 
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE); 
+    curl_close($ch);
+
+    if ($httpcode >= 400) { 
+        // Můžeš zde zalogovat chybu: error_log("Supabase fetch error for $table: HTTP $httpcode - $response");
+        return null; 
     }
+    
+    return json_decode($response, true);
 }
 
-// Seřazení hráčů podle počtu gólů
-usort($skaters, function($a, $b) {
-    return $b['goals'] - $a['goals'];
-});
+// Načtení top 3 hráčů v poli seřazených podle bodů (sloupec 'body')
+$top_skaters_query_params = 'select=jmeno,body,fotka_url,cislo_dresu,datum_narozeni,post&order=body.desc&limit=3';
+$top_skaters = fetchSupabaseData('players', $top_skaters_query_params);
 
-// Seřazení brankářů podle úspěšnosti zákroků
-usort($goalies, function($a, $b) {
-    return ($b['save_pct'] ?? 0) <=> ($a['save_pct'] ?? 0);
-});
+// Načtení top 3 brankářů seřazených podle úspěšnosti (sloupec 'uspesnost')
+$top_goalies_query_params = 'select=jmeno,uspesnost,fotka_url,cislo_dresu,datum_narozeni&order=uspesnost.desc&limit=3';
+$top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
+
 ?>
 <!DOCTYPE html>
 <html lang="cs">
@@ -34,88 +49,24 @@ usort($goalies, function($a, $b) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Warriors Chlumec</title>
     <link rel="icon" type="image/x-icon" href="chlumeclogo.png">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Roboto Condensed', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f8f9fa;
-        }
-        .carousel-item img {
-            height: 400px;
-            object-fit: cover;
-        }
-        .carousel-caption {
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
-            width: 90%;
-            max-width: 600px;
-            text-align: center;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-        }
-        .animate {
-            opacity: 1 !important;
-            transform: translateY(0) !important;
-        }
-        .section-title:hover {
-            transform: scale(1.1);
-            transition: transform 0.3s ease-in-out;
-        }
-        .card {
-            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-        }
-        .card:hover {
-            transform: scale(1.05);
-            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        .players-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            justify-items: center;
-            margin-top: 1.5rem;
-        }
-        .players-grid .card {
-            width: 100%;
-            max-width: 20rem; 
-        }
-        @media (max-width: 992px) {
-        .players-grid .card {
-        max-width: 20rem;
-        transform: scale(1);
-    }
-}
-
-@media (max-width: 768px) {
-    .players-grid .card {
-        max-width: 18rem;
-        transform: scale(1);
-    }
-}
-
-@media (max-width: 576px) {
-    .players-grid .card {
-        max-width: 100%;
-        transform: scale(1);
-    }
-}
-
-
-
+        /* Tvoje CSS styly zůstávají stejné */
+        body { font-family: 'Roboto Condensed', sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; }
+        .carousel-item img { height: 400px; object-fit: cover; }
+        .carousel-caption { background-color: rgba(0, 0, 0, 0.5); padding: 5px 10px; border-radius: 5px; width: 90%; max-width: 600px; text-align: center; left: 50%; transform: translateX(-50%);}
+        .section-title { font-size: 1.5rem; font-weight: 700; opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .animate { opacity: 1 !important; transform: translateY(0) !important; }
+        .section-title:hover { transform: scale(1.1); transition: transform 0.3s ease-in-out; }
+        .card { transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; }
+        .card:hover { transform: scale(1.05); box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2); }
+        .players-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; justify-items: center; margin-top: 1.5rem; }
+        .players-grid .card { width: 100%; max-width: 20rem; }
     </style>
     <script>
+        // Tvůj JavaScript zůstává stejný
         document.addEventListener("DOMContentLoaded", function() {
             const titles = document.querySelectorAll(".section-title");
             function checkScroll() {
@@ -140,10 +91,9 @@ usort($goalies, function($a, $b) {
 <?php endif; ?>
 
 <nav>
-    <?php include 'header.php'; ?>
+    <?php include 'header.php'; // Předpokládám, že máš hlavičku v tomto souboru ?>
 </nav>
 
-<!-- Karusel -->
 <div id="articlesCarousel" class="carousel slide" data-bs-ride="carousel">
     <div class="carousel-indicators">
         <button type="button" data-bs-target="#articlesCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
@@ -186,35 +136,43 @@ usort($goalies, function($a, $b) {
 <main class="container text-center pb-5">
     <h3 class="mt-4 section-title text-uppercase">Nejúspěšnější hráči</h3>
     <div class="players-grid">
-        <?php foreach (array_slice($skaters, 0, 3) as $player): ?>
-            <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($player['slug']) ?>'">
-                <img src="<?= htmlspecialchars($player['photo']) ?>" class="card-img-top" alt="<?= htmlspecialchars($player['name']) ?>" style="height: 200px; object-fit: cover;">
-                <div class="card-body text-center">
-                    <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($player['name']) ?> </h6>
-                    <p class="card-text" style="font-size: 1rem;">Góly: <strong><?= htmlspecialchars($player['goals']) ?></strong></p>
+        <?php if (!empty($top_skaters)): ?>
+            <?php foreach ($top_skaters as $player): ?>
+                <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($player['jmeno']) ?>'">
+                    <img src="<?= htmlspecialchars($player['fotka_url'] ?? 'images/default_photo.jpg') ?>" class="card-img-top" alt="<?= htmlspecialchars($player['jmeno']) ?>" style="height: 200px; object-fit: cover;">
+                    <div class="card-body text-center">
+                        <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($player['jmeno']) ?> </h6>
+                        <p class="card-text" style="font-size: 1rem;">Body: <strong><?= htmlspecialchars($player['body']) ?></strong></p>
+                    </div>
                 </div>
-            </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p>Žádní hráči k zobrazení.</p>
+        <?php endif; ?>
     </div>
 
     <h3 class="mt-4 section-title text-uppercase">Nejúspěšnější brankáři</h3>
     <div class="players-grid">
-        <?php foreach (array_slice($goalies, 0, 3) as $goalie): ?>
-            <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($goalie['slug']) ?>'">
-                <img src="<?= htmlspecialchars($goalie['photo']) ?>" class="card-img-top" alt="<?= htmlspecialchars($goalie['name']) ?>" style="height: 200px; object-fit: cover;">
-                <div class="card-body text-center">
-                    <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($goalie['name']) ?> </h6>
-                    <p class="card-text" style="font-size: 1rem;">Úspěšnost zákroků: <strong><?= htmlspecialchars(number_format($goalie['save_pct'], 2)) ?>%</strong></p>
+        <?php if (!empty($top_goalies)): ?>
+            <?php foreach ($top_goalies as $goalie): ?>
+                <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($goalie['jmeno']) ?>'">
+                    <img src="<?= htmlspecialchars($goalie['fotka_url'] ?? 'images/default_photo.jpg') ?>" class="card-img-top" alt="<?= htmlspecialchars($goalie['jmeno']) ?>" style="height: 200px; object-fit: cover;">
+                    <div class="card-body text-center">
+                        <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($goalie['jmeno']) ?> </h6>
+                        <p class="card-text" style="font-size: 1rem;">Úspěšnost: <strong><?= htmlspecialchars(number_format($goalie['uspesnost'] ?? 0, 2)) ?>%</strong></p>
+                    </div>
                 </div>
-            </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p>Žádní brankáři k zobrazení (tabulka 'goalies' je pravděpodobně prázdná, nebo se nepodařilo načíst data).</p>
+        <?php endif; ?>
     </div>
 </main>
 
 <footer>
-    <?php include 'footer.php'; ?>
+    <?php include 'footer.php'; // Předpokládám, že máš patičku v tomto souboru ?>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

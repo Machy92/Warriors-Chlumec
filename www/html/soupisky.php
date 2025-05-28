@@ -39,6 +39,7 @@ foreach ($roster as $hrac) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Soupiska - Warriors Chlumec</title>
+    <link rel="icon" type="image/x-icon" href="chlumeclogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .player-card { border: 1px solid #ddd; border-radius: 10px; padding: 20px; text-align: center; background-color: white; position: relative; transition: 0.3s; height: 100%; }
