@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'config.php'; // Načteme konfiguraci a funkci fetchSupabaseData
 
 // Definujeme varianty názvu týmu Warriors pro porovnání
