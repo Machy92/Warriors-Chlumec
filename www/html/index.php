@@ -1,45 +1,25 @@
 <?php
 session_start();
+// Předpokládáme, že máš config.php s $supabaseUrl, $supabaseKey a fetchSupabaseData()
+require_once 'config.php'; 
 
-    $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co'; // Nahraď za své
-    $supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // Nahraď za svůj public anon key
+// --- KONTROLA PŘIHLÁŠENÍ UŽIVATELE ---
+// TUTO PODMÍNKU SI MUSÍŠ PŘIZPŮSOBIT SVÉMU SYSTÉMU PŘIHLAŠOVÁNÍ!
+// Například, pokud po úspěšném přihlášení nastavuješ $_SESSION['user_id']:
+$user_is_logged_in = isset($_SESSION['user_id']); 
+// Pokud chceš, aby to viděl jen admin, podmínka by byla např.:
+// $user_is_logged_in = (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin');
 
-// Zapnutí zobrazení chyb (pro vývoj, na produkci můžeš zakomentovat nebo smazat)
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
-function fetchSupabaseData($table, $queryParams = 'select=*') {
-    global $supabaseUrl, $supabaseKey; // Abychom viděli proměnné zvenku
-
-    $url = "{$supabaseUrl}/rest/v1/{$table}?{$queryParams}";
-    
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'apikey: ' . $supabaseKey,
-        'Authorization: Bearer ' . $supabaseKey,
-        'Prefer: return=representation' 
-    ]);
-    
-    $response = curl_exec($ch);
-    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE); 
-    curl_close($ch);
-
-    if ($httpcode >= 400) { 
-        // Můžeš zde zalogovat chybu: error_log("Supabase fetch error for $table: HTTP $httpcode - $response");
-        return null; 
-    }
-    
-    return json_decode($response, true);
-}
-
-// Načtení top 3 hráčů v poli seřazených podle bodů (sloupec 'body')
+// Načtení top hráčů a brankářů (tato logika zůstává)
 $top_skaters_query_params = 'select=jmeno,body,fotka_url,cislo_dresu,datum_narozeni,post&order=body.desc&limit=3';
 $top_skaters = fetchSupabaseData('players', $top_skaters_query_params);
 
-// Načtení top 3 brankářů seřazených podle úspěšnosti (sloupec 'uspesnost')
 $top_goalies_query_params = 'select=jmeno,uspesnost,fotka_url,cislo_dresu,datum_narozeni&order=uspesnost.desc&limit=3';
 $top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
+
+// Načtení položek karuselu (tato logika zůstává)
+$carousel_items_query_params = 'select=image_url,title,description&is_active=eq.true&order=item_order.asc';
+$carousel_items = fetchSupabaseData('carousel_items', $carousel_items_query_params);
 
 ?>
 <!DOCTYPE html>
@@ -53,7 +33,6 @@ $top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Tvoje CSS styly zůstávají stejné */
         body { font-family: 'Roboto Condensed', sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; }
         .carousel-item img { height: 400px; object-fit: cover; }
         .carousel-caption { background-color: rgba(0, 0, 0, 0.5); padding: 5px 10px; border-radius: 5px; width: 90%; max-width: 600px; text-align: center; left: 50%; transform: translateX(-50%);}
@@ -64,9 +43,15 @@ $top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
         .card:hover { transform: scale(1.05); box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2); }
         .players-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; justify-items: center; margin-top: 1.5rem; }
         .players-grid .card { width: 100%; max-width: 20rem; }
+        
+        /* Nový styl pro kontejner tlačítka pro správu karuselu */
+        .manage-carousel-container {
+            text-align: right; /* Umístí tlačítko doprava */
+            margin-bottom: 1rem; /* Odsazení pod tlačítkem, před hlavním obsahem */
+            margin-top: 1rem; /* Odsazení nad tlačítkem */
+        }
     </style>
     <script>
-        // Tvůj JavaScript zůstává stejný
         document.addEventListener("DOMContentLoaded", function() {
             const titles = document.querySelectorAll(".section-title");
             function checkScroll() {
@@ -84,53 +69,53 @@ $top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
 </head>
 <body>
 
-<?php if (isset($_GET['login']) && $_GET['login'] == 'success'): ?>
-    <div style="background: green; color: white; padding: 10px; text-align: center;">
-        Úspěšně jste se přihlásili!
-    </div>
-<?php endif; ?>
+<?php 
+if (isset($_GET['login']) && $_GET['login'] == 'success' && !isset($_SESSION['login_message_shown'])) {
+    echo '<div style="background: green; color: white; padding: 10px; text-align: center;">Úspěšně jste se přihlásili!</div>';
+    $_SESSION['login_message_shown'] = true; 
+}
+?>
 
 <nav>
-    <?php include 'header.php'; // Předpokládám, že máš hlavičku v tomto souboru ?>
+    <?php include 'header.php'; ?>
 </nav>
 
 <div id="articlesCarousel" class="carousel slide" data-bs-ride="carousel">
     <div class="carousel-indicators">
-        <button type="button" data-bs-target="#articlesCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
-        <button type="button" data-bs-target="#articlesCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
-        <button type="button" data-bs-target="#articlesCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+        <?php if (!empty($carousel_items)): ?>
+            <?php foreach ($carousel_items as $index => $item): ?>
+                <button type="button" data-bs-target="#articlesCarousel" data-bs-slide-to="<?= $index ?>" class="<?= $index === 0 ? 'active' : '' ?>" aria-current="<?= $index === 0 ? 'true' : 'false' ?>" aria-label="Slide <?= $index + 1 ?>"></button>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
     <div class="carousel-inner">
-        <div class="carousel-item active">
-            <img src="img1.jpg" class="d-block w-100" alt="Popis článku 1">
-            <div class="carousel-caption">
-                <h5>Sezóna začíná!</h5>
-                <p>První zápas nové sezóny se blíží. Přijďte podpořit tým Warriors Chlumec!</p>
+        <?php if (!empty($carousel_items)): ?>
+            <?php foreach ($carousel_items as $index => $item): ?>
+                <div class="carousel-item <?= $index === 0 ? 'active' : '' ?>">
+                    <img src="<?= htmlspecialchars($item['image_url']) ?>" class="d-block w-100" alt="<?= htmlspecialchars($item['title']) ?>">
+                    <div class="carousel-caption">
+                        <h5><?= htmlspecialchars($item['title']) ?></h5>
+                        <p><?= htmlspecialchars($item['description']) ?></p>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="carousel-item active">
+                <img src="images/default_carousel.jpg" class="d-block w-100" alt="Výchozí obrázek">
+                <div class="carousel-caption"><h5>Vítejte na stránkách Warriors Chlumec</h5><p>Obsah karuselu bude brzy doplněn.</p></div>
             </div>
-        </div>
-        <div class="carousel-item">
-            <img src="img2.jpg" class="d-block w-100" alt="Popis článku 2">
-            <div class="carousel-caption">
-                <h5>Turnaj mladých nadějí</h5>
-                <p>Warriors si vedli skvěle a přivezli domů pohár!</p>
-            </div>
-        </div>
-        <div class="carousel-item">
-            <img src="img3.jpg" class="d-block w-100" alt="Popis článku 3">
-            <div class="carousel-caption">
-                <h5>Nová posila v týmu</h5>
-                <p>Zkušený hráč posílí naši obranu!</p>
-            </div>
-        </div>
+        <?php endif; ?>
     </div>
-    <button class="carousel-control-prev" type="button" data-bs-target="#articlesCarousel" data-bs-slide="prev">
-        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-        <span class="visually-hidden">Předchozí</span>
-    </button>
-    <button class="carousel-control-next" type="button" data-bs-target="#articlesCarousel" data-bs-slide="next">
-        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-        <span class="visually-hidden">Další</span>
-    </button>
+    <button class="carousel-control-prev" type="button" data-bs-target="#articlesCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Předchozí</span></button>
+    <button class="carousel-control-next" type="button" data-bs-target="#articlesCarousel" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Další</span></button>
+</div>
+
+<div class="container manage-carousel-container">
+    <?php if ($user_is_logged_in): ?>
+        <a href="admin_carousel.php" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-cog"></i> Spravovat Karusel 
+        </a>
+    <?php endif; ?>
 </div>
  
 <main class="container text-center pb-5">
@@ -170,7 +155,7 @@ $top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
 </main>
 
 <footer>
-    <?php include 'footer.php'; // Předpokládám, že máš patičku v tomto souboru ?>
+    <?php include 'footer.php'; ?>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

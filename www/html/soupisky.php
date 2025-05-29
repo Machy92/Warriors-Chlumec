@@ -1,4 +1,5 @@
 <?php
+session_start();
 function fetchSupabaseData($table, $queryParams = 'select=*') {
     // ZDE MÁŠ SVÉ ÚDAJE K SUPABASE
     $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';

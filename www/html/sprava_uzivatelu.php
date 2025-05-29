@@ -127,7 +127,7 @@ $users = json_decode($usersResponse, true);
                     <label for="pozice" class="form-label">Pozice</label>
                     <input type="text" class="form-control" id="pozice" name="pozice" required>
                 </div>
-                <button type="submit" name="invite_user" class="btn btn-primary">
+                <button type="submit" name="invite_user" class="btn btn-secondary">
                     <i class="fa-solid fa-paper-plane"></i> Odeslat pozvánku
                 </button>
             </form>
@@ -153,7 +153,6 @@ $users = json_decode($usersResponse, true);
                             <th>Jméno</th>
                             <th>Email</th>
                             <th>Pozice</th>
-                            <th class="d-none d-md-table-cell">Role</th>
                             <th class="d-none d-lg-table-cell">Registrován</th>
                             <th>Akce</th>
                         </tr>
@@ -167,7 +166,6 @@ $users = json_decode($usersResponse, true);
                                     <td><?= htmlspecialchars($user['jmeno'] ?? 'N/A') ?></td>
                                     <td><?= htmlspecialchars($user['email']) ?></td>
                                     <td><?= htmlspecialchars($user['pozice'] ?? 'N/A') ?></td>
-                                    <td class="d-none d-md-table-cell"><span class="badge bg-secondary"><?= htmlspecialchars($user['role'] ?? 'user') ?></span></td>
                                     <td class="d-none d-lg-table-cell"><?= date('d.m.Y', strtotime($user['created_at'])) ?></td>
                                     <td>
                                         <?php if ($user['id'] !== $userId): ?>

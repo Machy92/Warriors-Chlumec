@@ -72,7 +72,7 @@ if (is_array($profiles)) {
 
     <?php if (isset($_SESSION['user_id'])): ?>
         <div class="text-center mb-4">
-            <a href="pridat-aktualitu.php" class="btn btn-success"><i class="fa-solid fa-plus"></i> Přidat aktualitu</a>
+            <a href="pridat-aktualitu.php" class="btn btn-secondary"><i class="fa-solid fa-plus"></i> Přidat aktualitu</a>
         </div>
     <?php endif; ?>
 
