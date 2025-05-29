@@ -1,196 +1,234 @@
 <?php
+require_once 'config.php'; // Načteme konfiguraci a funkci fetchSupabaseData
 
-require 'db.php';
-try {
-    $conn = new PDO("pgsql:host=$host;dbname=$dbname", $user, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+// Definujeme varianty názvu týmu Warriors pro porovnání
+define('WARRIORS_TEAM_NAME_VARIANTS', ["HSÚ SHC Warriors Chlumec", "Warriors Chlumec", "Warriors Chlumec B", "SHC Warriors Chlumec"]);
 
-    $sql_zapasy = "SELECT * FROM zapas ORDER BY date, time";
-    $stmt_zapasy = $conn->prepare($sql_zapasy);
-    $stmt_zapasy->execute();
-    $zapasy = $stmt_zapasy->fetchAll(PDO::FETCH_ASSOC);
+// 1. Načtení ODEHRANÝCH zápasů
+$odehrane_params = 'select=*&odehrano=eq.true&order=datum_cas_text.desc';
+$odehrane_zapasy_raw = fetchSupabaseData('zapasy', $odehrane_params);
 
-    $sql_vysledky = "SELECT * FROM vysledek ORDER BY id DESC"; 
-    $stmt_vysledky = $conn->prepare($sql_vysledky);
-    $stmt_vysledky->execute();
-    $vysledky = $stmt_vysledky->fetchAll(PDO::FETCH_ASSOC);
+// 2. Načtení všech zápasů označených jako NEODEHRANÉ
+$potencialni_budouci_params = 'select=*&odehrano=eq.false&order=datum_cas_text.asc'; // Seřadíme od nejbližších
+$potencialni_budouci_zapasy_raw = fetchSupabaseData('zapasy', $potencialni_budouci_params);
 
-    $logos = [
-        "Warriors" => "chlumeclogo1.png",
-        "Tigers" => "tigerslogo1.png",
-        "Lions" => "lionslogo1.png",        
-        "Sharks" => "sharkslogo.png",
-        "Falcons" => "falconslogo1.png",
-        "Eagles" => "eagleslogo1.png"
-    ];
+// --- Filtrace starých "budoucích" zápasů ---
+$opravdove_budouci_zapasy = [];
+if (!empty($potencialni_budouci_zapasy_raw)) {
+    $dnes_pulnoc = new DateTime(); 
+    $dnes_pulnoc->setTime(0, 0, 0); 
 
-} catch (PDOException $e) {
-    echo "Chyba připojení: " . $e->getMessage();
+    foreach ($potencialni_budouci_zapasy_raw as $zapas) {
+        $datum_text = $zapas['datum_cas_text'];
+        $datum_zapasu_obj = null;
+        $datum_text_pro_parsovani = preg_replace('/^[A-ZŽŠČŘĎŤŇÚŮÝÁÉÍÓa-zžščřďťňúůýáéíó]{2,3}\s+/u', '', $datum_text);
+        $datum_text_pro_parsovani = str_replace('.', '.', $datum_text_pro_parsovani);
+
+        $datum_zapasu_obj = DateTime::createFromFormat('d.m.Y, H:i', $datum_text_pro_parsovani);
+        if (!$datum_zapasu_obj) {
+            $datum_zapasu_obj = DateTime::createFromFormat('d.m.Y', $datum_text_pro_parsovani);
+        }
+
+        if ($datum_zapasu_obj) {
+            $datum_zapasu_obj->setTime(0, 0, 0); 
+            if ($datum_zapasu_obj >= $dnes_pulnoc) {
+                $opravdove_budouci_zapasy[] = $zapas;
+            }
+        } else {
+            // $opravdove_budouci_zapasy[] = $zapas; // Zahrnout i nerozparsované? Raději ne, pokud chceme jen budoucí.
+            error_log("Nepodařilo se rozparsovat datum pro budoucí zápas: " . $datum_text);
+        }
+    }
 }
-?>
 
+// --- Příprava fází pro filtr a seskupení ---
+$faze_order = ['Play-Off', 'Nadstavba - skupina A', 'Základní část']; // Pořadí pro zobrazení, nejvyšší fáze první
+
+// Získání unikátních fází z odehraných zápasů pro dropdown
+$available_phases_played = [];
+if (!empty($odehrane_zapasy_raw)) {
+    foreach ($odehrane_zapasy_raw as $zapas) {
+        $faze = $zapas['faze_souteze'] ?? 'Neznámá fáze';
+        if (!in_array($faze, $available_phases_played)) {
+            $available_phases_played[] = $faze;
+        }
+    }
+    // Seřadíme fáze v dropdownu podle $faze_order
+    usort($available_phases_played, function($a, $b) use ($faze_order) {
+        $pos_a = array_search($a, $faze_order);
+        $pos_b = array_search($b, $faze_order);
+        if ($pos_a === false && $pos_b === false) return strcmp($a, $b);
+        if ($pos_a === false) return 1;
+        if ($pos_b === false) return -1;
+        return $pos_a - $pos_b;
+    });
+}
+
+// Zpracování filtru fáze
+$selected_phase = $_GET['faze'] ?? 'vsechny'; // Výchozí hodnota
+
+// Filtrace odehraných zápasů podle vybrané fáze
+$filtered_odehrane_zapasy_for_grouping = [];
+if ($selected_phase === 'vsechny') {
+    $filtered_odehrane_zapasy_for_grouping = $odehrane_zapasy_raw;
+} else {
+    if (!empty($odehrane_zapasy_raw)) {
+        foreach ($odehrane_zapasy_raw as $zapas) {
+            if (($zapas['faze_souteze'] ?? 'Neznámá fáze') === $selected_phase) {
+                $filtered_odehrane_zapasy_for_grouping[] = $zapas;
+            }
+        }
+    }
+}
+
+// Funkce pro rozdělení zápasů podle fáze soutěže a seřazení fází
+function group_games_by_phase($games_array, $phase_order_array) {
+    $grouped_games = [];
+    if (!empty($games_array)) {
+        foreach ($games_array as $zapas) {
+            $faze = $zapas['faze_souteze'] ?? 'Neznámá fáze';
+            $grouped_games[$faze][] = $zapas;
+        }
+    }
+    uksort($grouped_games, function($a, $b) use ($phase_order_array) {
+        $pos_a = array_search($a, $phase_order_array);
+        $pos_b = array_search($b, $phase_order_array);
+        if ($pos_a === false && $pos_b === false) return strcmp($a, $b);
+        if ($pos_a === false) return 1;
+        if ($pos_b === false) return -1;
+        return $pos_a - $pos_b;
+    });
+    return $grouped_games;
+}
+
+$odehrane_zapasy_podle_faze = group_games_by_phase($filtered_odehrane_zapasy_for_grouping, $faze_order);
+$budouci_zapasy_podle_faze = group_games_by_phase($opravdove_budouci_zapasy, $faze_order); 
+
+?>
 <!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Warriors Chlumec</title>
+    <title>Přehled Zápasů - Warriors Chlumec</title>
     <link rel="icon" type="image/x-icon" href="chlumeclogo.png">
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- Vlastní styl -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-    body {
-        background-color: #f4f4f4;
-        }
-    .card {
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        border: none;
-        border-radius: 10px;
-    }
-    .team-logo {
-        width: 40px;
-        height: auto;
-    }
-    .team-name {
-        font-size: 18px;
-        font-weight: bold;
-    }
-    .vs-text {
-        font-size: 16px;
-        color: #555;
-        font-weight: bold;
-    }
-    .match-card, .result-card {
-        margin-bottom: 20px;
-        height: 170px; /* Nastavení stejné výšky pro všechny karty */
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-    .card-body {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-    .result-card[data-status="prohra"] {
-        border: 2px solid red;
-    }
-    .result-card[data-status="vyhra"] {
-        border: 2px solid green;
-    }
-    .text-center-middle {
-        text-align: center;
-        margin-top: 10px;
-        flex-grow: 1; /* Umožní flexboxu, aby vyplnil zbývající prostor */
-    }
-    h1 {
-        margin: 40px 0; /* Zvýšení horního a spodního odsazení nadpisů */
-    }
-</style>
-
+        .game-card { border: 1px solid #e0e0e0; border-radius: .375rem; margin-bottom: 1rem; padding: 1rem; background-color: #fff; transition: box-shadow .15s ease-in-out; }
+        .game-card:hover { box-shadow: 0 .5rem 1rem rgba(0,0,0,.15); }
+        .game-card.warriors-win { border-left: 5px solid #198754; }
+        .game-card.warriors-loss { border-left: 5px solid #dc3545; }
+        .game-card.warriors-draw { border-left: 5px solid #ffc107; }
+        .team-name-home, .team-name-away { font-weight: bold; }
+        .score-section { font-weight: bold; font-size: 1.25rem; white-space: nowrap; }
+        .vs-separator { color: #6c757d; margin: 0 0.5rem; }
+        .game-meta { font-size: 0.875rem; color: #6c757d; }
+        .section-heading { margin-top: 2.5rem; margin-bottom: 0.5rem; padding-bottom: 0.75rem; font-weight: bold; font-size: 1.75rem; border-bottom: 2px solid #6c757d; }
+        .phase-title { margin-top: 1.5rem; margin-bottom: 1rem; border-bottom: 1px dashed #ccc; padding-bottom: 0.5rem; color: #333; font-weight: bold; font-size: 1.25rem; }
+        .game-status { font-size: 0.8rem; font-style: italic; }
+        .filter-form .form-select { max-width: 300px; } /* Omezení šířky dropdownu */
     </style>
 </head>
 <body>
-<nav>
-<?php include 'header.php'; ?>
-</nav>
+    <?php include 'header.php'; ?>
 
-    <div class="container">
+    <div class="container mt-4 mb-5">
+        <h1 class="text-center mb-5">Přehled Zápasů</h1>
+
         <div class="row">
-            <!-- Nadcházející zápasy -->
             <div class="col-lg-6">
-                <h1 class="mb-4">Nadcházející zápasy</h1>
-                <?php if (!empty($zapasy)): ?>
-                    <?php foreach ($zapasy as $zapas): ?>
-                        <div class="card match-card p-3">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div class="team">
-                                        <?php if (isset($logos[$zapas['domaci']])): ?>
-                                            <img src="logos/<?= htmlspecialchars($logos[$zapas['domaci']]) ?>" alt="<?= htmlspecialchars($zapas['domaci']) ?>" class="team-logo">
-                                        <?php endif; ?>
-                                        <span class="team-name"><?= htmlspecialchars($zapas['domaci']) ?></span>
+                <h2 class="section-heading">Odehrané zápasy</h2>
+
+                <form method="GET" action="zapasy.php" class="mb-3 filter-form">
+                    <label for="faze_select" class="form-label">Filtrovat podle fáze:</label>
+                    <select name="faze" id="faze_select" class="form-select d-inline-block w-auto" onchange="this.form.submit()">
+                        <option value="vsechny" <?= ($selected_phase === 'vsechny' ? 'selected' : '') ?>>Všechny fáze</option>
+                        <?php foreach ($available_phases_played as $faze_option): ?>
+                            <option value="<?= htmlspecialchars($faze_option) ?>" <?= ($selected_phase === $faze_option ? 'selected' : '') ?>>
+                                <?= htmlspecialchars($faze_option) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+
+                <?php if (!empty($odehrane_zapasy_podle_faze)): ?>
+                    <?php foreach ($odehrane_zapasy_podle_faze as $faze => $zapasy_ve_fazi): ?>
+                        <h3 class="phase-title"><?= htmlspecialchars($faze) ?></h3>
+                        <?php foreach ($zapasy_ve_fazi as $zapas): ?>
+                            <?php
+                            $card_border_class = '';
+                            if ($zapas['odehrano']) {
+                                if ($zapas['vysledek_warriors'] === 'vyhra') $card_border_class = ' warriors-win';
+                                elseif ($zapas['vysledek_warriors'] === 'prohra') $card_border_class = ' warriors-loss';
+                                elseif ($zapas['vysledek_warriors'] === 'remiza') $card_border_class = ' warriors-draw';
+                            }
+                            ?>
+                            <div class="game-card shadow-sm<?= $card_border_class ?>">
+                                <div class="row align-items-center">
+                                    <div class="col-12 col-sm-5 text-sm-end team-name-home">
+                                        <?= htmlspecialchars($zapas['domaci_tym']) ?>
                                     </div>
-                                    <span class="vs-text">vs</span>
-                                    <div class="team">
-                                        <?php if (isset($logos[$zapas['hoste']])): ?>
-                                            <img src="logos/<?= htmlspecialchars($logos[$zapas['hoste']]) ?>" alt="<?= htmlspecialchars($zapas['hoste']) ?>" class="team-logo">
-                                        <?php endif; ?>
-                                        <span class="team-name"><?= htmlspecialchars($zapas['hoste']) ?></span>
+                                    <div class="col-12 col-sm-2 text-center score-section my-2 my-sm-0">
+                                        <span><?= htmlspecialchars($zapas['domaci_skore']) ?></span>
+                                        <span class="vs-separator">:</span>
+                                        <span><?= htmlspecialchars($zapas['hostujici_skore']) ?></span>
+                                    </div>
+                                    <div class="col-12 col-sm-5 text-sm-start team-name-away">
+                                        <?= htmlspecialchars($zapas['hostujici_tym']) ?>
                                     </div>
                                 </div>
-                                <div class="text-center-middle">
-                                    <p><?= date('j.n.Y', strtotime($zapas['date'])) ?></p>
-                                    <p><?= date('H:i', strtotime($zapas['time'])) ?> / <?= htmlspecialchars($zapas['misto']) ?></p>
+                                <div class="row mt-1">
+                                    <div class="col-12 text-center game-meta">
+                                        <?= htmlspecialchars($zapas['datum_cas_text']) ?>
+                                        | <span class="game-status">Odehráno</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        <?php endforeach; ?>
                     <?php endforeach; ?>
+                <?php elseif ($selected_phase !== 'vsechny' && empty($odehrane_zapasy_podle_faze)): ?>
+                     <div class="alert alert-secondary text-center mt-4">Pro vybranou fázi nebyly nalezeny žádné odehrané zápasy.</div>
                 <?php else: ?>
-                    <div class="alert alert-warning">Žádné zápasy nenalezeny</div>
+                    <div class="alert alert-secondary text-center mt-4">Nebyly nalezeny žádné odehrané zápasy.</div>
                 <?php endif; ?>
             </div>
 
-            <!-- Výsledky zápasů -->
             <div class="col-lg-6">
-                <h1 class="mb-4">Výsledky zápasů</h1>
-                <?php if (!empty($vysledky)): ?>
-                    <?php foreach ($vysledky as $vysledek): ?>
-                        <?php
-                            list($skore_domaci, $skore_hoste) = explode(':', $vysledek['vysledek']);
-                            $status = 'vyhra';
-
-                            if (stripos($vysledek['domaci'], 'warriors') !== false && (int)$skore_domaci < (int)$skore_hoste) {
-                                $status = 'prohra';
-                            } elseif (stripos($vysledek['hoste'], 'warriors') !== false && (int)$skore_hoste < (int)$skore_domaci) {
-                                $status = 'prohra';
-                            }
-                        ?>
-                        <div class="card result-card p-3" data-status="<?= $status ?>">
-                            <div class="card-body">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <div class="team">
-                                        <?php if (isset($logos[$vysledek['domaci']])): ?>
-                                            <img src="logos/<?= htmlspecialchars($logos[$vysledek['domaci']]) ?>" alt="<?= htmlspecialchars($vysledek['domaci']) ?>" class="team-logo">
-                                        <?php endif; ?>
-                                        <span class="team-name"><?= htmlspecialchars($vysledek['domaci']) ?></span>
+                <h2 class="section-heading">Budoucí zápasy</h2>
+                <?php if (!empty($budouci_zapasy_podle_faze)): ?>
+                     <?php foreach ($budouci_zapasy_podle_faze as $faze => $zapasy_ve_fazi): ?>
+                        <h3 class="phase-title"><?= htmlspecialchars($faze) ?></h3>
+                        <?php foreach ($zapasy_ve_fazi as $zapas): ?>
+                            <div class="game-card shadow-sm">
+                                <div class="row align-items-center">
+                                    <div class="col-12 col-sm-5 text-sm-end team-name-home">
+                                        <?= htmlspecialchars($zapas['domaci_tym']) ?>
                                     </div>
-                                    <span class="vs-text">vs</span>
-                                    <div class="team">
-                                        <?php if (isset($logos[$vysledek['hoste']])): ?>
-                                            <img src="logos/<?= htmlspecialchars($logos[$vysledek['hoste']]) ?>" alt="<?= htmlspecialchars($vysledek['hoste']) ?>" class="team-logo">
-                                        <?php endif; ?>
-                                        <span class="team-name"><?= htmlspecialchars($vysledek['hoste']) ?></span>
+                                    <div class="col-12 col-sm-2 text-center score-section my-2 my-sm-0">
+                                        <span class="vs-separator">vs</span>
+                                    </div>
+                                    <div class="col-12 col-sm-5 text-sm-start team-name-away">
+                                        <?= htmlspecialchars($zapas['hostujici_tym']) ?>
                                     </div>
                                 </div>
-                                <div class="text-center-middle">
-                                    <h2><?= htmlspecialchars($vysledek['vysledek']) ?></h2>
+                                <div class="row mt-1">
+                                    <div class="col-12 text-center game-meta">
+                                        <?= htmlspecialchars($zapas['datum_cas_text']) ?>
+                                        | <span class="game-status">Připravuje se</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        <?php endforeach; ?>
                     <?php endforeach; ?>
                 <?php else: ?>
-                    <div class="alert alert-warning">Žádné výsledky nenalezeny</div>
+                    <div class="alert alert-secondary text-center mt-4">Aktuálně nejsou naplánovány žádné budoucí zápasy.</div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 
-    <footer class="mt-5">
-        <?php include 'footer.php'; ?>
-    </footer>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+    <?php include 'footer.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
