@@ -35,7 +35,7 @@ function parse_date_from_text_string_for_index($datum_text) {
 
 // --- 1. Načtení a spolehlivé určení POSLEDNÍHO ZÁPASU ---
 $last_match = null;
-$faze_order_for_index = ['Play-Off', 'Nadstavba - skupina A', 'Základní část'];
+$faze_order_for_index = ['Play-Off', 'Nadstavba - skupina A', 'Základní část']; 
 $last_matches_params = 'select=*,domaci_logo_url,hostujici_logo_url&odehrano=eq.true';
 $last_matches_data = fetchSupabaseData('zapasy', $last_matches_params);
 
@@ -53,7 +53,9 @@ if (!empty($last_matches_data)) {
         if (!$date_a || !$date_b) return 0;
         return $date_b <=> $date_a;
     });
-    $last_match = $last_matches_data[0];
+    if (isset($last_matches_data[0])) { // Pojistka, pokud by pole bylo prázdné po neúspěšném fetchi
+        $last_match = $last_matches_data[0];
+    }
 }
 
 // --- 2. Načtení a spolehlivé určení BUDOUCÍHO ZÁPASU ---
@@ -74,6 +76,41 @@ if (!empty($potential_future_matches)) {
         }
     }
 }
+
+// --- 3. Logika pro NEJBLIŽŠÍ NAROZENINY ---
+function daysUntilBirthday($birthDate) {
+    if (!$birthDate) return 366; // Pokud datum není, vrátíme vysoké číslo
+    try {
+        $today = new DateTime();
+        $birthDateObj = new DateTime($birthDate); // Předpokládáme, že datum je ve formátu, který DateTime zvládne
+        $birthDateThisYear = new DateTime($today->format('Y') . '-' . $birthDateObj->format('m-d'));
+        if ($birthDateThisYear < $today) { $birthDateThisYear->modify('+1 year'); }
+        $interval = $today->diff($birthDateThisYear);
+        return intval($interval->format('%a'));
+    } catch (Exception $e) { return 366; } // V případě chyby parsování
+}
+$closestBirthdayPlayer = null;
+$minDays = 366;
+// Pro narozeniny potřebujeme hráče, kteří mají 'datum_narozeni', 'jmeno' a 'fotka_url'
+// Použijeme data, která již máme načtená pro top hráče a brankáře
+$players_for_birthday_check = [];
+if (!empty($top_skaters)) { $players_for_birthday_check = array_merge($players_for_birthday_check, $top_skaters); }
+if (!empty($top_goalies)) { $players_for_birthday_check = array_merge($players_for_birthday_check, $top_goalies); }
+// Pokud byste měli kompletní seznam všech hráčů v jedné proměnné, použijte tu.
+// Prozatím prohledáváme jen $top_skaters a $top_goalies.
+
+if (!empty($players_for_birthday_check)) {
+    foreach ($players_for_birthday_check as $player) {
+        if (!empty($player['datum_narozeni'])) {
+            $days = daysUntilBirthday($player['datum_narozeni']);
+            if ($days < $minDays) {
+                $minDays = $days;
+                $closestBirthdayPlayer = $player;
+            }
+        }
+    }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="cs">
@@ -83,7 +120,7 @@ if (!empty($potential_future_matches)) {
     <title>Warriors Chlumec</title>
     <link rel="icon" type="image/x-icon" href="chlumeclogo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
     <style>
         html { box-sizing: border-box; height: 100%; margin: 0; padding: 0; }
@@ -96,17 +133,15 @@ if (!empty($potential_future_matches)) {
             display: flex; 
             flex-direction: column; 
         }
-        main { /* Hlavní obsah se roztáhne */
+        main { 
             flex-grow: 1;
         }
-        /* Styly pro karusel (z vaší preferované verze) */
         .carousel-item img { height: 400px; object-fit: cover; }
         .carousel-caption { background-color: rgba(0, 0, 0, 0.5); padding: 5px 10px; border-radius: 5px; width: 90%; max-width: 600px; text-align: center; left: 50%; transform: translateX(-50%);}
         
         .section-title { font-size: 1.6rem; font-weight: 700; opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; margin-bottom: 1.5rem;}
         .animate { opacity: 1 !important; transform: translateY(0) !important; }
         
-        /* Styly pro karty zápasů */
         .match-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.07); margin-bottom: 1rem; height: 100%; display: flex; flex-direction: column; }
         .match-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
         .match-header h4 { font-size: 1.2rem; font-weight: 700; margin: 0; }
@@ -121,7 +156,6 @@ if (!empty($potential_future_matches)) {
         .match-date-time { font-size: 1.2rem; font-weight: 700; white-space: nowrap; }
         .match-footer { text-align: center; margin-top: 20px; }
         
-        /* Karty hráčů */
         .players-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.8rem; margin-top: 1rem; }
         .players-grid .card { flex: 0 1 180px; max-width: 180px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.07); text-align: center; border: none; transition: transform 0.3s ease, box-shadow 0.3s ease; }
         .players-grid .card:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
@@ -130,18 +164,33 @@ if (!empty($potential_future_matches)) {
         .players-grid .card-title { font-size: 1rem; font-weight: 700; text-transform: uppercase; }
         .players-grid .card-text { font-size: 0.9rem; color: #666; }
         
-        /* Styly pro postranní panel */
         .sidebar-title { font-size: 0.9rem; font-weight: 700; color: #6c757d; margin-bottom: 0.75rem; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
-        .sidebar-card { background: #ffffff; border-radius: 12px; padding: 20px 15px; text-align: center; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #e9ecef; }
+        .sidebar-card { background: #ffffff; border-radius: 12px; padding: 20px 15px; text-align: center; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #e9ecef; transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out; }
         .sidebar-card img { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 12px; }
-        .sidebar-card h6 { font-size: 1rem; font-weight: 700; color: #1a2a4c; text-transform: uppercase; }
+        .sidebar-card h6 { font-size: 1rem; font-weight: 700; color: #1a2a4c; text-transform: uppercase; margin-bottom: 0.25rem; } /* Upraven margin */
         .sidebar-card p { font-size: 0.8rem; margin-bottom: 0; color: #555; min-height: 36px; }
         
+        /* === NOVÝ STYL PRO KLIKATELNÉ KARTY V SIDEBARU === */
+        a.sidebar-card-link {
+            text-decoration: none; 
+            color: inherit; 
+            display: block; 
+            margin-bottom: 1rem; /* Přidán margin pro oddělení odkazů */
+        }
+        a.sidebar-card-link:last-child {
+            margin-bottom: 0; /* Odebrání marginu u posledního odkazu */
+        }
+
+        a.sidebar-card-link .sidebar-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        
         .manage-carousel-container { text-align: right; margin-bottom: 1rem; margin-top: 1rem; }
-        @media (max-width: 991.98px) { /* Používáme breakpoint lg přesněji */
+        @media (max-width: 991.98px) { 
              .main-content-row { order: 2; } 
              .sidebar-row { order: 1; margin-bottom: 2rem; }
-             /* Tato media query již existovala, není třeba duplikovat pro match-card, pokud je .row a .col-lg-6 již responzivní */
         }
     </style>
     <script>
@@ -210,33 +259,6 @@ if (isset($_GET['login']) && $_GET['login'] == 'success' && !isset($_SESSION['lo
 
 <main class="container py-4">
     <div class="row">
-        <?php
-        function daysUntilBirthday($birthDate) {
-            if (!$birthDate) return 366;
-            try {
-                $today = new DateTime();
-                $birthDateThisYear = new DateTime($today->format('Y') . '-' . (new DateTime($birthDate))->format('m-d'));
-                if ($birthDateThisYear < $today) { $birthDateThisYear->modify('+1 year'); }
-                $interval = $today->diff($birthDateThisYear);
-                return intval($interval->format('%a'));
-            } catch (Exception $e) { return 366; }
-        }
-        $closestBirthdayPlayer = null;
-        $minDays = 366;
-        $all_players_for_bday = array_merge($top_skaters, $top_goalies);
-        if (!empty($all_players_for_bday)) {
-            foreach ($all_players_for_bday as $player) {
-                if (!empty($player['datum_narozeni'])) {
-                    $days = daysUntilBirthday($player['datum_narozeni']);
-                    if ($days < $minDays) {
-                        $minDays = $days;
-                        $closestBirthdayPlayer = $player;
-                    }
-                }
-            }
-        }
-        ?>
-
         <div class="col-lg-1 d-none d-lg-block"></div>
 
         <div class="col-lg-8 col-md-12 main-content-row">
@@ -278,39 +300,53 @@ if (isset($_GET['login']) && $_GET['login'] == 'success' && !isset($_SESSION['lo
         <div class="col-lg-3 col-md-12 sidebar-row">
             <div class="sticky-top" style="top: 20px;">
                 
-                <?php if ($closestBirthdayPlayer): ?>
+                <?php if ($closestBirthdayPlayer && isset($closestBirthdayPlayer['jmeno'])): ?>
+                    <a href="profil_hrace.php?jmeno=<?= urlencode($closestBirthdayPlayer['jmeno']) ?>" class="sidebar-card-link">
+                        <div> <h5 class="sidebar-title">Nejbližší narozeniny</h5>
+                            <div class="sidebar-card">
+                                <img src="<?= htmlspecialchars($closestBirthdayPlayer['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($closestBirthdayPlayer['jmeno']) ?>">
+                                <h6><?= htmlspecialchars($closestBirthdayPlayer['jmeno']) ?></h6>
+                                <p>
+                                    <?php
+                                    if ($minDays === 0) {
+                                        echo "<strong>Právě dnes slaví!</strong><br>Přejeme všechno nejlepší!";
+                                    } elseif ($minDays === 1) {
+                                        echo "Narozeniny oslaví <strong>již zítra!</strong>";
+                                    } else {
+                                        echo "Narozeniny oslaví za <strong>{$minDays}</strong> dní.";
+                                    }
+                                    ?>
+                                </p>
+                            </div>
+                        </div>
+                    </a>
+                <?php elseif ($closestBirthdayPlayer): // Fallback pro případ, že jméno není, ale hráč existuje (nemělo by nastat) ?>
                     <div>
                         <h5 class="sidebar-title">Nejbližší narozeniny</h5>
                         <div class="sidebar-card">
-                            <img src="<?= htmlspecialchars($closestBirthdayPlayer['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($closestBirthdayPlayer['jmeno']) ?>">
-                            <h6><?= htmlspecialchars($closestBirthdayPlayer['jmeno']) ?></h6>
-                            <p>
-                                <?php
-                                if ($minDays === 0) {
-                                    echo "<strong>Právě dnes slaví!</strong><br>Přejeme všechno nejlepší!";
-                                } elseif ($minDays === 1) {
-                                    echo "Narozeniny oslaví <strong>již zítra!</strong>";
-                                } else {
-                                    echo "Narozeniny oslaví za <strong>{$minDays}</strong> dní.";
-                                }
-                                ?>
-                            </p>
+                             <p class="text-muted">Informace o narozeninách nejsou kompletní.</p>
                         </div>
                     </div>
                 <?php endif; ?>
 
-                <?php if ($most_penalized_player && isset($most_penalized_player['trestne_minuty']) && $most_penalized_player['trestne_minuty'] > 0): ?>
-                    <div class="mt-4">
-                        <h5 class="sidebar-title">Král trestné lavice</h5>
-                        <div class="sidebar-card">
-                            <img src="<?= htmlspecialchars($most_penalized_player['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($most_penalized_player['jmeno']) ?>">
-                            <h6><?= htmlspecialchars($most_penalized_player['jmeno']) ?></h6>
-                            <p>
-                                Celkem <strong><?= htmlspecialchars($most_penalized_player['trestne_minuty']) ?></strong> tr. min.
-                            </p>
+
+                <?php if ($most_penalized_player && isset($most_penalized_player['jmeno']) && isset($most_penalized_player['trestne_minuty']) && $most_penalized_player['trestne_minuty'] > 0): ?>
+                    <a href="profil_hrace.php?jmeno=<?= urlencode($most_penalized_player['jmeno']) ?>" class="sidebar-card-link">
+                        <div class="mt-4"> <h5 class="sidebar-title">Král trestné lavice</h5>
+                            <div class="sidebar-card">
+                                <img src="<?= htmlspecialchars($most_penalized_player['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($most_penalized_player['jmeno']) ?>">
+                                <h6><?= htmlspecialchars($most_penalized_player['jmeno']) ?></h6>
+                                <p>
+                                    Celkem <strong><?= htmlspecialchars($most_penalized_player['trestne_minuty']) ?></strong> tr. min.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                <?php endif; ?>
+                    </a>
+                 <?php elseif ($most_penalized_player && isset($most_penalized_player['jmeno'])): // Zobrazí hráče, i když má 0 minut, ale bez odkazu na trestné minuty
+                     // Toto je spíše pro ladění, normálně by se nezobrazilo, pokud není trestný.
+                     // Můžete tuto část smazat, pokud nechcete zobrazovat hráče s 0 TM.
+                 ?>
+                    <?php endif; ?>
 
             </div>
         </div>
