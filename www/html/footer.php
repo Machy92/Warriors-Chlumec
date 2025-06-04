@@ -32,7 +32,8 @@
     padding: 30px 15px 20px;
     text-align: center;
     font-size: 14px;
-    margin-top: auto;
+    /* margin-top: auto;  <-- Ujistěte se, že tento řádek je smazaný nebo zakomentovaný */
+    flex-shrink: 0; /* Důležité: Zabrání patičce, aby se zmenšila, pokud by obsah přetékal */
 }
 
 .footer-logo img {

@@ -1,122 +1,201 @@
 <?php
 session_start();
 
+// Pokud uživatel není přihlášen, přesměrujeme ho na login.php
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
+// Nastavení pro komunikaci se Supabase
 $supabaseUrl = 'https://opytqyxheeezvwncboly.supabase.co';
-$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE';
+$supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weXRxeXhoZWVlenZ3bmNib2x5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2NDAyMTMsImV4cCI6MjA2MzIxNjIxM30.h_DdvClVy4-xbEkQ3AWQose3dqPaxPQ1gl-LaLhwtCE'; // Anon key
 $userId = $_SESSION['user_id'];
+$access_token = $_SESSION['access_token'] ?? $supabaseKey; // Použijte access token uživatele ze session, pokud jej máte
 
 $headers = [
     "apikey: $supabaseKey",
-    "Authorization: Bearer $supabaseKey",
+    "Authorization: Bearer $access_token", 
     "Content-Type: application/json"
 ];
 
-// Načtení profilu
+// Načtení profilu uživatele pomocí cURL (bez fotka_url)
 $ch = curl_init("$supabaseUrl/rest/v1/user_profiles_with_email?user_id=eq.$userId&select=jmeno,pozice,vytvoreno,email");
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_HTTPHEADER => $headers
 ]);
 $response = curl_exec($ch);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-$data = json_decode($response, true);
-$profile = $data[0] ?? null;
+$profile = null;
+$error = null;
 
-if (!$profile) {
-    $error = "Nepodařilo se načíst profil.";
+if ($http_code === 200) {
+    $data = json_decode($response, true);
+    $profile = $data[0] ?? null;
+    if (!$profile) {
+        $error = "Profil pro daného uživatele nebyl nalezen.";
+    }
+} else {
+    $error = "Nepodařilo se načíst profil. Zkuste to prosím později.";
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profil uživatele</title>
+    <title>Profil uživatele - Warriors Chlumec</title>
     <link rel="icon" href="chlumeclogo.png">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css"> 
+    <style>
+        /* CSS pro "přilepenou" patičku */
+        html {
+            box-sizing: border-box;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh; 
+            display: flex;
+            flex-direction: column;
+        }
+        main.page-content { /* Cílíme na <main> tag pro roztažení */
+            flex-grow: 1; 
+        }
+
+        /* Vlastní styl pro omezení maximální šířky kontejneru profilu */
+        .profile-container-wrapper { 
+            width: 100%;
+        }
+        .profile-content-card {
+            max-width: 700px; 
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .list-group-item strong.d-block {
+            margin-bottom: 0.2rem;
+        }
+        .btn-warning, .btn-outline-danger, .btn-success {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+            font-weight: 500;
+        }
+    </style>
 </head>
 <body>
+
 <?php include 'header.php'; ?>
 
-<div class="container mt-5 mb-5">
-    <div class="row justify-content-center">
-        <div class="col-11 col-md-8 col-lg-6"> <?php if (isset($_GET['heslo'])): ?>
-                <?php if ($_GET['heslo'] === 'ok'): ?>
-                    <div class="alert alert-success text-center">Heslo bylo úspěšně změněno.</div>
-                <?php else: ?>
-                    <div class="alert alert-danger text-center">Nepodařilo se změnit heslo. Zkontroluj zadané údaje.</div>
-                <?php endif; ?>
+<main class="page-content container my-4 my-md-5">
+    <div class="profile-container-wrapper"> 
+        <div class="profile-content-card"> 
+
+            <?php if (isset($_GET['heslo_zmeneno'])): ?>
+                <?php 
+                $alert_type = 'danger';
+                $message = 'Při změně hesla nastala neznámá chyba.';
+                if ($_GET['heslo_zmeneno'] === 'ok') {
+                    $alert_type = 'success';
+                    $message = '<i class="fa-solid fa-check-circle me-2"></i>Heslo bylo úspěšně změněno.';
+                } elseif ($_GET['heslo_zmeneno'] === 'chyba') {
+                    $message = '<i class="fa-solid fa-xmark-circle me-2"></i>Při změně hesla nastala chyba. Zkontrolujte zadané údaje.';
+                } elseif ($_GET['heslo_zmeneno'] === 'neshoda') {
+                    $message = '<i class="fa-solid fa-triangle-exclamation me-2"></i>Nové heslo a potvrzení hesla se neshodují.';
+                } elseif ($_GET['heslo_zmeneno'] === 'stareSpatne') {
+                    $message = '<i class="fa-solid fa-triangle-exclamation me-2"></i>Zadané staré heslo není správné.';
+                }
+                ?>
+                <div class="alert alert-<?= $alert_type ?> text-center shadow-sm">
+                    <?= $message ?>
+                </div>
             <?php endif; ?>
 
-            <h2 class="text-center mb-4">Profil uživatele</h2>
+            <?php if (!empty($error)): ?>
+                <div class="alert alert-danger text-center shadow-sm"><?= htmlspecialchars($error) ?></div>
+            <?php elseif ($profile): ?>
+                <div class="card shadow-lg rounded-4 border-0">
+                    <div class="card-body p-4 p-md-5">
+                        
+                        <div class="text-center mb-4">
+                            <h2 class="card-title mb-1">
+                                <?= htmlspecialchars($profile['jmeno']) ?>
+                            </h2>
+                            <p class="text-muted fs-5">
+                                <i class="fa-solid fa-briefcase me-1"></i> <?= htmlspecialchars($profile['pozice'] ?? 'Pozice neuvedena') ?>
+                            </p>
+                        </div>
 
-            <?php if (isset($error)): ?>
-                <div class="alert alert-danger text-center"><?= htmlspecialchars($error) ?></div>
-            <?php else: ?>
-                <div class="card shadow rounded">
-                    <div class="card-body p-4">
-                        <h5 class="card-title text-center mb-4"> <i class="fa-solid fa-user"></i> <?= htmlspecialchars($profile['jmeno']) ?>
-                        </h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item">
-                                <i class="fa-solid fa-briefcase text-muted me-2"></i> <strong>Pozice:</strong> <?= htmlspecialchars($profile['pozice']) ?>
+                        <ul class="list-group list-group-flush mb-4">
+                            <li class="list-group-item d-flex align-items-start py-3">
+                                <i class="fa-solid fa-envelope fa-lg text-muted me-3 mt-1" style="width: 24px;"></i>
+                                <div>
+                                    <strong class="d-block">E-mail</strong>
+                                    <span><?= htmlspecialchars($profile['email'] ?? 'Neuveden') ?></span>
+                                </div>
                             </li>
-                            <li class="list-group-item">
-                                <i class="fa-solid fa-envelope text-muted me-2"></i>
-                                <strong>E-mail:</strong> <?= htmlspecialchars($profile['email'] ?? 'Neuveden') ?>
-                            </li>
-                            <li class="list-group-item">
-                                <i class="fa-solid fa-calendar-plus text-muted me-2"></i>
-                                <strong>Datum registrace:</strong> <?= htmlspecialchars(date('d.m.Y H:i', strtotime($profile['vytvoreno']))) ?>
+                            <li class="list-group-item d-flex align-items-start py-3">
+                                <i class="fa-solid fa-calendar-plus fa-lg text-muted me-3 mt-1" style="width: 24px;"></i>
+                                <div>
+                                    <strong class="d-block">Datum registrace</strong>
+                                    <span><?= htmlspecialchars(date('d. m. Y H:i', strtotime($profile['vytvoreno']))) ?></span>
+                                </div>
                             </li>
                         </ul>
 
-                        <div class="mt-4">
-                            <button class="btn btn-warning w-100" onclick="document.getElementById('changePasswordForm').style.display='block'">
-                                <i class="fa-solid fa-key"></i> Změnit heslo
-                            </button>
-
-                            <div id="changePasswordForm" class="mt-4 border p-4 rounded bg-light" style="display:none;">
-                                <h5 class="mb-3">Změna hesla</h5>
+                        <div class="collapse" id="changePasswordForm">
+                            <div class="border p-3 p-md-4 rounded-3 bg-light-subtle mb-4 shadow-sm">
+                                <h5 class="mb-3 fw-semibold text-center">Změna hesla</h5>
                                 <form method="post" action="change_password.php">
                                     <div class="mb-3">
-                                        <label for="old_password" class="form-label">Staré heslo</label>
-                                        <input type="password" name="old_password" id="old_password" class="form-control" required>
+                                        <label for="old_password" class="form-label">Současné heslo</label>
+                                        <input type="password" name="old_password" id="old_password" class="form-control form-control-lg" required>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="new_password" class="form-label">Nové heslo</label>
-                                        <input type="password" name="new_password" id="new_password" class="form-control" required minlength="6">
+                                        <label for="new_password" class="form-label">Nové heslo (min. 6 znaků)</label>
+                                        <input type="password" name="new_password" id="new_password" class="form-control form-control-lg" required minlength="6">
                                     </div>
                                     <div class="mb-3">
-                                        <label for="confirm_password" class="form-label">Zopakuj nové heslo</label>
-                                        <input type="password" name="confirm_password" id="confirm_password" class="form-control" required minlength="6">
+                                        <label for="confirm_password" class="form-label">Zopakujte nové heslo</label>
+                                        <input type="password" name="confirm_password" id="confirm_password" class="form-control form-control-lg" required minlength="6">
                                     </div>
-                                    <button type="submit" class="btn btn-success">Potvrdit změnu</button>
+                                    <button type="submit" class="btn btn-success w-100 btn-lg">
+                                        <i class="fa-solid fa-floppy-disk me-2"></i>Uložit změnu
+                                    </button>
                                 </form>
                             </div>
-
-                            <a href="logout.php" class="btn btn-outline-danger w-100 mt-3">
-                                <i class="fa-solid fa-right-from-bracket"></i> Odhlásit se
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-warning btn-lg" type="button" data-bs-toggle="collapse" data-bs-target="#changePasswordForm" aria-expanded="false" aria-controls="changePasswordForm">
+                                <i class="fa-solid fa-key me-2"></i>Změnit heslo
+                            </button>
+                            <a href="logout.php" class="btn btn-outline-danger btn-lg">
+                                <i class="fa-solid fa-right-from-bracket me-2"></i>Odhlásit se
                             </a>
                         </div>
+
                     </div>
                 </div>
+            <?php else: ?>
+                 <div class="alert alert-info text-center shadow-sm">Profil nebyl nalezen.</div>
             <?php endif; ?>
 
         </div>
     </div>
-</div>
+</main>
 
 <?php include 'footer.php'; ?>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

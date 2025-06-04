@@ -1,26 +1,79 @@
 <?php
 session_start();
-// Předpokládáme, že máš config.php s $supabaseUrl, $supabaseKey a fetchSupabaseData()
+// Předpokládáme, že máte config.php s $supabaseUrl, $supabaseKey a fetchSupabaseData()
 require_once 'config.php'; 
 
 // --- KONTROLA PŘIHLÁŠENÍ UŽIVATELE ---
-// TUTO PODMÍNKU SI MUSÍŠ PŘIZPŮSOBIT SVÉMU SYSTÉMU PŘIHLAŠOVÁNÍ!
-// Například, pokud po úspěšném přihlášení nastavuješ $_SESSION['user_id']:
 $user_is_logged_in = isset($_SESSION['user_id']); 
-// Pokud chceš, aby to viděl jen admin, podmínka by byla např.:
-// $user_is_logged_in = (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin');
 
-// Načtení top hráčů a brankářů (tato logika zůstává)
+// --- NAČTENÍ DAT ---
+
+// Načtení statistik hráčů a karuselu
 $top_skaters_query_params = 'select=jmeno,body,fotka_url,cislo_dresu,datum_narozeni,post&order=body.desc&limit=3';
 $top_skaters = fetchSupabaseData('players', $top_skaters_query_params);
-
 $top_goalies_query_params = 'select=jmeno,uspesnost,fotka_url,cislo_dresu,datum_narozeni&order=uspesnost.desc&limit=3';
 $top_goalies = fetchSupabaseData('goalies', $top_goalies_query_params);
-
-// Načtení položek karuselu (tato logika zůstává)
 $carousel_items_query_params = 'select=image_url,title,description&is_active=eq.true&order=item_order.asc';
 $carousel_items = fetchSupabaseData('carousel_items', $carousel_items_query_params);
 
+// Načtení nejtrestanějšího hráče (předpokládá sloupec 'trestne_minuty')
+$most_penalized_query_params = 'select=jmeno,fotka_url,trestne_minuty&order=trestne_minuty.desc&limit=1';
+$most_penalized_player_data = fetchSupabaseData('players', $most_penalized_query_params);
+$most_penalized_player = !empty($most_penalized_player_data) ? $most_penalized_player_data[0] : null;
+
+// Funkce pro parsování textového data
+function parse_date_from_text_string_for_index($datum_text) {
+    if (empty($datum_text)) return null;
+    $datum_text_pro_parsovani = preg_replace('/^[A-ZŽŠČŘĎŤŇÚŮÝÁÉÍÓa-zžščřďťňúůýáéíó]{2,3}\s+/u', '', $datum_text);
+    $formats_to_try = ['d.m.Y, H:i', 'd.m.Y', 'j.n.Y, H:i', 'j.n.Y'];
+    foreach ($formats_to_try as $format) {
+        $date_obj = DateTime::createFromFormat($format, $datum_text_pro_parsovani);
+        if ($date_obj) return $date_obj;
+    }
+    return null;
+}
+
+// --- 1. Načtení a spolehlivé určení POSLEDNÍHO ZÁPASU ---
+$last_match = null;
+$faze_order_for_index = ['Play-Off', 'Nadstavba - skupina A', 'Základní část'];
+$last_matches_params = 'select=*,domaci_logo_url,hostujici_logo_url&odehrano=eq.true';
+$last_matches_data = fetchSupabaseData('zapasy', $last_matches_params);
+
+if (!empty($last_matches_data)) {
+    usort($last_matches_data, function($a, $b) use ($faze_order_for_index) {
+        $faze_a = $a['faze_souteze'] ?? 'Neznámá fáze';
+        $faze_b = $b['faze_souteze'] ?? 'Neznámá fáze';
+        $pos_a = array_search($faze_a, $faze_order_for_index);
+        $pos_b = array_search($faze_b, $faze_order_for_index);
+        if ($pos_a === false) $pos_a = 999;
+        if ($pos_b === false) $pos_b = 999;
+        if ($pos_a !== $pos_b) return $pos_a <=> $pos_b;
+        $date_a = parse_date_from_text_string_for_index($a['datum_cas_text']);
+        $date_b = parse_date_from_text_string_for_index($b['datum_cas_text']);
+        if (!$date_a || !$date_b) return 0;
+        return $date_b <=> $date_a;
+    });
+    $last_match = $last_matches_data[0];
+}
+
+// --- 2. Načtení a spolehlivé určení BUDOUCÍHO ZÁPASU ---
+$future_match = null;
+$future_matches_params = 'select=*,domaci_logo_url,hostujici_logo_url&odehrano=eq.false&order=datum_cas_text.asc';
+$potential_future_matches = fetchSupabaseData('zapasy', $future_matches_params);
+if (!empty($potential_future_matches)) {
+    $dnes_pulnoc = new DateTime(); 
+    $dnes_pulnoc->setTime(0, 0, 0); 
+    foreach ($potential_future_matches as $zapas) {
+        $datum_zapasu_obj = parse_date_from_text_string_for_index($zapas['datum_cas_text']);
+        if ($datum_zapasu_obj) {
+            $datum_zapasu_obj->setTime(0, 0, 0); 
+            if ($datum_zapasu_obj >= $dnes_pulnoc) {
+                $future_match = $zapas;
+                break;
+            }
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="cs">
@@ -33,22 +86,62 @@ $carousel_items = fetchSupabaseData('carousel_items', $carousel_items_query_para
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Roboto Condensed', sans-serif; margin: 0; padding: 0; background-color: #f8f9fa; }
+        html { box-sizing: border-box; height: 100%; margin: 0; padding: 0; }
+        *, *:before, *:after { box-sizing: inherit; }
+        body { 
+            font-family: 'Roboto Condensed', sans-serif; 
+            margin: 0; padding: 0; 
+            background-color: #f8f9fa; 
+            min-height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        main { /* Hlavní obsah se roztáhne */
+            flex-grow: 1;
+        }
+        /* Styly pro karusel (z vaší preferované verze) */
         .carousel-item img { height: 400px; object-fit: cover; }
         .carousel-caption { background-color: rgba(0, 0, 0, 0.5); padding: 5px 10px; border-radius: 5px; width: 90%; max-width: 600px; text-align: center; left: 50%; transform: translateX(-50%);}
-        .section-title { font-size: 1.5rem; font-weight: 700; opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
-        .animate { opacity: 1 !important; transform: translateY(0) !important; }
-        .section-title:hover { transform: scale(1.1); transition: transform 0.3s ease-in-out; }
-        .card { transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out; }
-        .card:hover { transform: scale(1.05); box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2); }
-        .players-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; justify-items: center; margin-top: 1.5rem; }
-        .players-grid .card { width: 100%; max-width: 20rem; }
         
-        /* Nový styl pro kontejner tlačítka pro správu karuselu */
-        .manage-carousel-container {
-            text-align: right; /* Umístí tlačítko doprava */
-            margin-bottom: 1rem; /* Odsazení pod tlačítkem, před hlavním obsahem */
-            margin-top: 1rem; /* Odsazení nad tlačítkem */
+        .section-title { font-size: 1.6rem; font-weight: 700; opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; margin-bottom: 1.5rem;}
+        .animate { opacity: 1 !important; transform: translateY(0) !important; }
+        
+        /* Styly pro karty zápasů */
+        .match-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.07); margin-bottom: 1rem; height: 100%; display: flex; flex-direction: column; }
+        .match-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .match-header h4 { font-size: 1.2rem; font-weight: 700; margin: 0; }
+        .match-type { font-size: 0.8rem; font-weight: 700; padding: 4px 8px; border-radius: 5px; background-color: #e9ecef; color: #495057; }
+        .match-body { display: flex; justify-content: space-between; align-items: center; text-align: center; flex-grow: 1; }
+        .match-team { flex: 1; }
+        .match-team img { height: 60px; width: 60px; object-fit: contain; margin-bottom: 10px; }
+        .match-team h5 { font-size: 1rem; font-weight: 700; min-height: 40px; }
+        .match-details { padding: 0 15px; }
+        .match-score { font-size: 2.5rem; font-weight: 700; }
+        .match-status { font-size: 0.8rem; color: #6c757d; }
+        .match-date-time { font-size: 1.2rem; font-weight: 700; white-space: nowrap; }
+        .match-footer { text-align: center; margin-top: 20px; }
+        
+        /* Karty hráčů */
+        .players-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.8rem; margin-top: 1rem; }
+        .players-grid .card { flex: 0 1 180px; max-width: 180px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.07); text-align: center; border: none; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .players-grid .card:hover { transform: translateY(-8px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+        .players-grid .card-img-top { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; margin: 20px auto 15px; border: 4px solid #f0f0f0; }
+        .players-grid .card-body { padding: 0 15px 20px; }
+        .players-grid .card-title { font-size: 1rem; font-weight: 700; text-transform: uppercase; }
+        .players-grid .card-text { font-size: 0.9rem; color: #666; }
+        
+        /* Styly pro postranní panel */
+        .sidebar-title { font-size: 0.9rem; font-weight: 700; color: #6c757d; margin-bottom: 0.75rem; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+        .sidebar-card { background: #ffffff; border-radius: 12px; padding: 20px 15px; text-align: center; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border: 1px solid #e9ecef; }
+        .sidebar-card img { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 12px; }
+        .sidebar-card h6 { font-size: 1rem; font-weight: 700; color: #1a2a4c; text-transform: uppercase; }
+        .sidebar-card p { font-size: 0.8rem; margin-bottom: 0; color: #555; min-height: 36px; }
+        
+        .manage-carousel-container { text-align: right; margin-bottom: 1rem; margin-top: 1rem; }
+        @media (max-width: 991.98px) { /* Používáme breakpoint lg přesněji */
+             .main-content-row { order: 2; } 
+             .sidebar-row { order: 1; margin-bottom: 2rem; }
+             /* Tato media query již existovala, není třeba duplikovat pro match-card, pokud je .row a .col-lg-6 již responzivní */
         }
     </style>
     <script>
@@ -57,9 +150,7 @@ $carousel_items = fetchSupabaseData('carousel_items', $carousel_items_query_para
             function checkScroll() {
                 titles.forEach(title => {
                     const rect = title.getBoundingClientRect();
-                    if (rect.top < window.innerHeight - 100) {
-                        title.classList.add("animate");
-                    }
+                    if (rect.top < window.innerHeight - 100) { title.classList.add("animate"); }
                 });
             }
             window.addEventListener("scroll", checkScroll);
@@ -71,7 +162,7 @@ $carousel_items = fetchSupabaseData('carousel_items', $carousel_items_query_para
 
 <?php 
 if (isset($_GET['login']) && $_GET['login'] == 'success' && !isset($_SESSION['login_message_shown'])) {
-    echo '<div style="background: green; color: white; padding: 10px; text-align: center;">Úspěšně jste se přihlásili!</div>';
+    echo '<div class="alert alert-success text-center mb-0">Úspěšně jste se přihlásili!</div>';
     $_SESSION['login_message_shown'] = true; 
 }
 ?>
@@ -110,49 +201,193 @@ if (isset($_GET['login']) && $_GET['login'] == 'success' && !isset($_SESSION['lo
     <button class="carousel-control-next" type="button" data-bs-target="#articlesCarousel" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Další</span></button>
 </div>
 
+
 <div class="container manage-carousel-container">
     <?php if ($user_is_logged_in): ?>
-        <a href="admin_carousel.php" class="btn btn-outline-secondary btn-sm">
-            <i class="fas fa-cog"></i> Spravovat Karusel 
-        </a>
+        <a href="admin_carousel.php" class="btn btn-outline-secondary btn-sm"><i class="fas fa-cog"></i> Spravovat Karusel</a>
     <?php endif; ?>
 </div>
- 
-<main class="container text-center pb-5">
-    <h3 class="mt-4 section-title text-uppercase">Nejúspěšnější hráči</h3>
-    <div class="players-grid">
-        <?php if (!empty($top_skaters)): ?>
-            <?php foreach ($top_skaters as $player): ?>
-                <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($player['jmeno']) ?>'">
-                    <img src="<?= htmlspecialchars($player['fotka_url'] ?? 'images/default_photo.jpg') ?>" class="card-img-top" alt="<?= htmlspecialchars($player['jmeno']) ?>" style="height: 200px; object-fit: cover;">
-                    <div class="card-body text-center">
-                        <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($player['jmeno']) ?> </h6>
-                        <p class="card-text" style="font-size: 1rem;">Body: <strong><?= htmlspecialchars($player['body']) ?></strong></p>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <p>Žádní hráči k zobrazení.</p>
-        <?php endif; ?>
-    </div>
 
-    <h3 class="mt-4 section-title text-uppercase">Nejúspěšnější brankáři</h3>
-    <div class="players-grid">
-        <?php if (!empty($top_goalies)): ?>
-            <?php foreach ($top_goalies as $goalie): ?>
-                <div class="card shadow-sm" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($goalie['jmeno']) ?>'">
-                    <img src="<?= htmlspecialchars($goalie['fotka_url'] ?? 'images/default_photo.jpg') ?>" class="card-img-top" alt="<?= htmlspecialchars($goalie['jmeno']) ?>" style="height: 200px; object-fit: cover;">
-                    <div class="card-body text-center">
-                        <h6 class="card-title text-uppercase fw-semibold" style="font-size: 1.1rem;"> <?= htmlspecialchars($goalie['jmeno']) ?> </h6>
-                        <p class="card-text" style="font-size: 1rem;">Úspěšnost: <strong><?= htmlspecialchars(number_format($goalie['uspesnost'] ?? 0, 2)) ?>%</strong></p>
+<main class="container py-4">
+    <div class="row">
+        <?php
+        function daysUntilBirthday($birthDate) {
+            if (!$birthDate) return 366;
+            try {
+                $today = new DateTime();
+                $birthDateThisYear = new DateTime($today->format('Y') . '-' . (new DateTime($birthDate))->format('m-d'));
+                if ($birthDateThisYear < $today) { $birthDateThisYear->modify('+1 year'); }
+                $interval = $today->diff($birthDateThisYear);
+                return intval($interval->format('%a'));
+            } catch (Exception $e) { return 366; }
+        }
+        $closestBirthdayPlayer = null;
+        $minDays = 366;
+        $all_players_for_bday = array_merge($top_skaters, $top_goalies);
+        if (!empty($all_players_for_bday)) {
+            foreach ($all_players_for_bday as $player) {
+                if (!empty($player['datum_narozeni'])) {
+                    $days = daysUntilBirthday($player['datum_narozeni']);
+                    if ($days < $minDays) {
+                        $minDays = $days;
+                        $closestBirthdayPlayer = $player;
+                    }
+                }
+            }
+        }
+        ?>
+
+        <div class="col-lg-1 d-none d-lg-block"></div>
+
+        <div class="col-lg-8 col-md-12 main-content-row">
+            <h3 class="section-title text-uppercase text-center">Nejúspěšnější hráči</h3>
+            <div class="players-grid">
+                <?php if (!empty($top_skaters)): ?>
+                    <?php foreach ($top_skaters as $player): ?>
+                        <div class="card" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($player['jmeno']) ?>'">
+                            <img src="<?= htmlspecialchars($player['fotka_url'] ?? 'images/default_photo.jpg') ?>" class="card-img-top" alt="<?= htmlspecialchars($player['jmeno']) ?>">
+                            <div class="card-body">
+                                <h6 class="card-title text-uppercase fw-semibold"><?= htmlspecialchars($player['jmeno']) ?></h6>
+                                <p class="card-text">Body: <strong><?= htmlspecialchars($player['body']) ?></strong></p>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="text-center">Žádní hráči k zobrazení.</p>
+                <?php endif; ?>
+            </div>
+
+            <h3 class="mt-5 section-title text-uppercase text-center">Nejúspěšnější brankáři</h3>
+            <div class="players-grid">
+                <?php if (!empty($top_goalies)): ?>
+                    <?php foreach ($top_goalies as $goalie): ?>
+                        <div class="card" style="cursor:pointer;" onclick="window.location.href='profil_hrace.php?jmeno=<?= urlencode($goalie['jmeno']) ?>'">
+                            <img src="<?= htmlspecialchars($goalie['fotka_url'] ?? 'images/default_photo.jpg') ?>" class="card-img-top" alt="<?= htmlspecialchars($goalie['jmeno']) ?>">
+                            <div class="card-body">
+                                <h6 class="card-title text-uppercase fw-semibold"><?= htmlspecialchars($goalie['jmeno']) ?></h6>
+                                <p class="card-text">Úspěšnost: <strong><?= htmlspecialchars(number_format($goalie['uspesnost'] ?? 0, 2)) ?>%</strong></p>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p class="text-center">Žádní brankáři k zobrazení.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-12 sidebar-row">
+            <div class="sticky-top" style="top: 20px;">
+                
+                <?php if ($closestBirthdayPlayer): ?>
+                    <div>
+                        <h5 class="sidebar-title">Nejbližší narozeniny</h5>
+                        <div class="sidebar-card">
+                            <img src="<?= htmlspecialchars($closestBirthdayPlayer['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($closestBirthdayPlayer['jmeno']) ?>">
+                            <h6><?= htmlspecialchars($closestBirthdayPlayer['jmeno']) ?></h6>
+                            <p>
+                                <?php
+                                if ($minDays === 0) {
+                                    echo "<strong>Právě dnes slaví!</strong><br>Přejeme všechno nejlepší!";
+                                } elseif ($minDays === 1) {
+                                    echo "Narozeniny oslaví <strong>již zítra!</strong>";
+                                } else {
+                                    echo "Narozeniny oslaví za <strong>{$minDays}</strong> dní.";
+                                }
+                                ?>
+                            </p>
+                        </div>
                     </div>
-                </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <p>Žádní brankáři k zobrazení (tabulka 'goalies' je pravděpodobně prázdná, nebo se nepodařilo načíst data).</p>
-        <?php endif; ?>
+                <?php endif; ?>
+
+                <?php if ($most_penalized_player && isset($most_penalized_player['trestne_minuty']) && $most_penalized_player['trestne_minuty'] > 0): ?>
+                    <div class="mt-4">
+                        <h5 class="sidebar-title">Král trestné lavice</h5>
+                        <div class="sidebar-card">
+                            <img src="<?= htmlspecialchars($most_penalized_player['fotka_url'] ?? 'images/default_photo.jpg') ?>" alt="<?= htmlspecialchars($most_penalized_player['jmeno']) ?>">
+                            <h6><?= htmlspecialchars($most_penalized_player['jmeno']) ?></h6>
+                            <p>
+                                Celkem <strong><?= htmlspecialchars($most_penalized_player['trestne_minuty']) ?></strong> tr. min.
+                            </p>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+            </div>
+        </div>
     </div>
 </main>
+
+<div class="container my-5"> 
+    <div class="row">
+        <div class="col-lg-6 d-flex mb-3 mb-lg-0">
+            <div class="match-card w-100">
+                <div class="match-header">
+                    <h4>Poslední zápas</h4>
+                    <?php if($last_match && !empty($last_match['faze_souteze'])): ?>
+                        <span class="match-type"><?= htmlspecialchars($last_match['faze_souteze']) ?></span>
+                    <?php endif; ?>
+                </div>
+                <?php if ($last_match): ?>
+                    <div class="match-body">
+                        <div class="match-team">
+                            <img src="<?= htmlspecialchars($last_match['domaci_logo_url'] ?? 'images/default_logo.png') ?>" alt="<?= htmlspecialchars($last_match['domaci_tym']) ?>">
+                            <h5><?= htmlspecialchars($last_match['domaci_tym']) ?></h5>
+                        </div>
+                        <div class="match-details">
+                            <div class="match-score">
+                                <span><?= htmlspecialchars($last_match['domaci_skore']) ?></span>
+                                <span>:</span>
+                                <span><?= htmlspecialchars($last_match['hostujici_skore']) ?></span>
+                            </div>
+                            <div class="match-status">Konečný stav</div>
+                        </div>
+                        <div class="match-team">
+                            <img src="<?= htmlspecialchars($last_match['hostujici_logo_url'] ?? 'images/default_logo.png') ?>" alt="<?= htmlspecialchars($last_match['hostujici_tym']) ?>">
+                            <h5><?= htmlspecialchars($last_match['hostujici_tym']) ?></h5>
+                        </div>
+                    </div>
+                    <div class="match-footer">
+                        <a href="zapasy.php" class="btn btn-outline-dark btn-sm">Všechny odehrané zápasy</a>
+                    </div>
+                <?php else: ?>
+                     <div class="match-body"><p class="mb-0 text-muted">Žádný odehraný zápas k zobrazení.</p></div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="col-lg-6 d-flex">
+            <div class="match-card w-100">
+                 <div class="match-header">
+                    <h4>Příští zápas</h4>
+                    <?php if($future_match && !empty($future_match['faze_souteze'])): ?>
+                        <span class="match-type"><?= htmlspecialchars($future_match['faze_souteze']) ?></span>
+                    <?php endif; ?>
+                </div>
+                <?php if ($future_match): ?>
+                    <div class="match-body">
+                        <div class="match-team">
+                            <img src="<?= htmlspecialchars($future_match['domaci_logo_url'] ?? 'images/default_logo.png') ?>" alt="<?= htmlspecialchars($future_match['domaci_tym']) ?>">
+                            <h5><?= htmlspecialchars($future_match['domaci_tym']) ?></h5>
+                        </div>
+                        <div class="match-details">
+                            <div class="match-date-time"><?= htmlspecialchars($future_match['datum_cas_text']) ?></div>
+                        </div>
+                        <div class="match-team">
+                             <img src="<?= htmlspecialchars($future_match['hostujici_logo_url'] ?? 'images/default_logo.png') ?>" alt="<?= htmlspecialchars($future_match['hostujici_tym']) ?>">
+                            <h5><?= htmlspecialchars($future_match['hostujici_tym']) ?></h5>
+                        </div>
+                    </div>
+                    <div class="match-footer">
+                        <a href="zapasy.php" class="btn btn-dark btn-sm">Všechny budoucí zápasy</a>
+                    </div>
+                <?php else: ?>
+                    <div class="match-body"><p class="mb-0 text-muted">Žádný budoucí zápas k zobrazení.</p></div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <footer>
     <?php include 'footer.php'; ?>
